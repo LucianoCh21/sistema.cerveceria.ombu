@@ -1,5 +1,6 @@
 const { getConnection, sql } = require('../config/db');
 
+// 1. GET ALL
 const getCanillas = async (req, res) => {
     try {
         const pool = await getConnection();
@@ -10,6 +11,7 @@ const getCanillas = async (req, res) => {
     }
 };
 
+// 2. GET BY ID
 const getCanillaById = async (req, res) => {
     try {
         const pool = await getConnection();
@@ -24,6 +26,7 @@ const getCanillaById = async (req, res) => {
     }
 };
 
+// 3. POST (CREATE)
 const createCanilla = async (req, res) => {
     const { numero, estado } = req.body;
     if (!numero || !estado) return res.status(400).json({ error: "Faltan campos obligatorios" });
@@ -40,4 +43,51 @@ const createCanilla = async (req, res) => {
     }
 };
 
-module.exports = { getCanillas, getCanillaById, createCanilla };
+// 4. PUT (UPDATE)
+const updateCanilla = async (req, res, next) => {
+    const { numero, estado } = req.body;
+    const { id } = req.params;
+
+    if (!numero || !estado) {
+        return res.status(400).json({ error: "Faltan campos obligatorios (numero, estado)" });
+    }
+
+    try {
+        const pool = await getConnection();
+        const result = await pool.request()
+            .input('id', sql.Int, id)
+            .input('numero', sql.Int, numero)
+            .input('estado', sql.VarChar, estado)
+            .query('UPDATE Canilla SET numero = @numero, estado = @estado WHERE id_canilla = @id');
+
+        if (result.rowsAffected[0] === 0) {
+            return res.status(404).json({ error: "Canilla no encontrada para actualizar" });
+        }
+
+        res.status(200).json({ message: "Canilla actualizada exitosamente" });
+    } catch (error) {
+        res.status(500).json({ error: "Error interno del servidor" });
+    }
+};
+
+// 5. DELETE (REMOVE)
+const deleteCanilla = async (req, res, next) => {
+    const { id } = req.params;
+
+    try {
+        const pool = await getConnection();
+        const result = await pool.request()
+            .input('id', sql.Int, id)
+            .query('DELETE FROM Canilla WHERE id_canilla = @id');
+
+        if (result.rowsAffected[0] === 0) {
+            return res.status(404).json({ error: "Canilla no encontrada para eliminar" });
+        }
+
+        res.status(204).send();
+    } catch (error) {
+        res.status(500).json({ error: "Error interno del servidor" });
+    }
+};
+
+module.exports = { getCanillas, getCanillaById, createCanilla, updateCanilla, deleteCanilla };
