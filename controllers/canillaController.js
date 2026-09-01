@@ -39,6 +39,7 @@ const createCanilla = async (req, res) => {
             .query('INSERT INTO Canilla (numero, estado, fecha_alta) VALUES (@numero, @estado, GETDATE())');
         res.status(201).json({ message: "Canilla creada exitosamente" });
     } catch (error) {
+        console.error("Error SQL Server:", error); // Esto imprimirá el error real en tu terminal
         res.status(500).json({ error: "Error interno del servidor" });
     }
 };
@@ -66,6 +67,8 @@ const updateCanilla = async (req, res, next) => {
 
         res.status(200).json({ message: "Canilla actualizada exitosamente" });
     } catch (error) {
+        // AQUÍ EXPONEMOS EL ERROR EN LA TERMINAL
+        console.error("Error SQL Server en PUT:", error); 
         res.status(500).json({ error: "Error interno del servidor" });
     }
 };
@@ -86,6 +89,7 @@ const deleteCanilla = async (req, res, next) => {
 
         res.status(204).send();
     } catch (error) {
+        console.error("Error SQL Server en DELETE:", error); 
         res.status(500).json({ error: "Error interno del servidor" });
     }
 };
