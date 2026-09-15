@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ombú - Cervecería de Barrio | Muro de Canillas</title>
+    <!-- Hoja de estilos visuales de Ombú -->
+    <link rel="stylesheet" href="src/styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Barra lateral (Sidebar) -->
+        <aside class="sidebar">
+            <div class="brand">
+                <div class="brand-icon">🍺</div>
+                <div class="brand-text">
+                    <h1>Ombú</h1>
+                    <span>CERVECERÍA DE BARRIO</span>
+                </div>
+            </div>
+
+            <nav class="sidebar-nav">
+                <a href="#" class="nav-link active">
+                    <span>🚰</span> Muro de Canillas
+                </a>
+                <a href="#panel-alta" class="nav-link">
+                    <span>➕</span> Alta de Canilla
+                </a>
+                <a href="#" class="nav-link">
+                    <span>🛢️</span> Barriles y Stock
+                </a>
+                <a href="#" class="nav-link">
+                    <span>📲</span> Lecturas NFC
+                </a>
+                <a href="#" class="nav-link">
+                    <span>⚙️</span> Configuración
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <span class="badge-online">Sistema Online</span>
+                <p style="margin-top: 4px; font-size: 0.72rem;">Tap Wall Self-Service v1.0</p>
+            </div>
+        </aside>
+
+        <!-- Contenido Principal -->
+        <main class="main-content">
+            <!-- Encabezado Topbar con Breadcrumb -->
+            <header class="topbar">
+                <nav class="breadcrumb" aria-label="Ruta de navegación">
+                    <a href="#">Inicio</a>
+                    <span class="separator">/</span>
+                    <a href="#">Muro de Autoservicio</a>
+                    <span class="separator">/</span>
+                    <span class="active">Gestión de Canillas</span>
+                </nav>
+                <div class="topbar-actions">
+                    <span>Terminal: <strong>Barra Principal</strong></span>
+                </div>
+            </header>
+
+            <!-- Contenedor Central -->
+            <div class="content-wrapper">
+                <!-- Contenedores de Alertas (ocultos inicialmente con display: none) -->
+                <div id="alerta-exito" class="alerta alerta-exito" role="alert"></div>
+                <div id="alerta-error" class="alerta alerta-error" role="alert"></div>
+
+                <!-- Panel Estilizado con Formulario de Alta -->
+                <section id="panel-alta" class="form-panel">
+                    <div class="panel-header">
+                        <h2><span>➕</span> Registrar Nueva Canilla</h2>
+                        <p>Configure los parámetros del nuevo grifo para integrarlo al muro de autoservicio NFC.</p>
+                    </div>
+
+                    <form id="form-canilla" novalidate>
+                        <div class="form-grid">
+                            <!-- Número de Canilla -->
+                            <div class="form-group">
+                                <label for="numero">Número de Canilla</label>
+                                <input 
+                                    type="number" 
+                                    id="numero" 
+                                    name="numero" 
+                                    class="form-input" 
+                                    placeholder="Ej: 1" 
+                                    min="1"
+                                >
+                            </div>
+
+                            <!-- Estilo de Cerveza -->
+                            <div class="form-group">
+                                <label for="estilo">Estilo de Cerveza</label>
+                                <input 
+                                    type="text" 
+                                    id="estilo" 
+                                    name="estilo" 
+                                    class="form-input" 
+                                    placeholder="Ej: IPA, Scottish, Golden..."
+                                >
+                            </div>
+
+                            <!-- Variedad -->
+                            <div class="form-group">
+                                <label for="variedad">Variedad</label>
+                                <input 
+                                    type="text" 
+                                    id="variedad" 
+                                    name="variedad" 
+                                    class="form-input" 
+                                    placeholder="Ej: Session, Honey, Black..."
+                                >
+                            </div>
+
+                            <!-- Estado -->
+                            <div class="form-group">
+                                <label for="estado">Estado Operativo</label>
+                                <select id="estado" name="estado" class="form-select">
+                                    <option value="Activa">Activa</option>
+                                    <option value="Mantenimiento">Mantenimiento</option>
+                                    <option value="Inactiva">Inactiva</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="submit" id="btn-submit" class="btn-primary">
+                                <span>🍺</span> Registrar Canilla
+                            </button>
+                        </div>
+                    </form>
+                </section>
+
+                <!-- Sección Canillas Registradas -->
+                <section class="section-canillas">
+                    <div class="section-header">
+                        <h2>Canillas Registradas</h2>
+                        <span id="contador-canillas" class="counter">0 canillas</span>
+                    </div>
+
+                    <!-- Contenedor id="muro-canillas" con clase 'muro-canillas' -->
+                    <div id="muro-canillas" class="muro-canillas"></div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <!-- Lógica de interacción con el backend -->
+    <script>
+        const API_URL = 'http://localhost:3000/api/canillas';
+
+        const formCanilla = document.getElementById('form-canilla');
+        const alertaExito = document.getElementById('alerta-exito');
+        const alertaError = document.getElementById('alerta-error');
+        const muroCanillas = document.getElementById('muro-canillas');
+        const contadorCanillas = document.getElementById('contador-canillas');
+
+        // Función para ocultar y limpiar alertas
+        function ocultarAlertas() {
+            alertaExito.style.display = 'none';
+            alertaError.style.display = 'none';
+            alertaExito.textContent = '';
+            alertaError.textContent = '';
+        }
+
+        // Consultar (GET) la lista de canillas y dibujarlas dinámicamente en el muro de tarjetas
+        async function cargarCanillas() {
+            try {
+                const response = await fetch(API_URL);
+                if (!response.ok) {
+                    throw new Error(`Error en la consulta: ${response.status} ${response.statusText}`);
+                }
+                const canillas = await response.json();
+                dibujarMuroCanillas(canillas);
+            } catch (error) {
+                console.error('Error al consultar canillas:', error);
+                if (!muroCanillas.hasChildNodes() || muroCanillas.children.length === 0) {
+                    muroCanillas.innerHTML = `
+                        <div class="muro-vacio">
+                            <div class="vacio-icono">🍺</div>
+                            <h3>Sin conexión con el muro de canillas</h3>
+                            <p>No se pudo conectar con el servidor backend en http://localhost:3000.</p>
+                        </div>
+                    `;
+                }
+            }
+        }
+
+        // Renderizado dinámico de las tarjetas en el muro
+        function dibujarMuroCanillas(canillas) {
+            muroCanillas.innerHTML = '';
+
+            if (contadorCanillas) {
+                contadorCanillas.textContent = `${canillas.length} canilla${canillas.length === 1 ? '' : 's'}`;
+            }
+
+            if (!Array.isArray(canillas) || canillas.length === 0) {
+                muroCanillas.innerHTML = `
+                    <div class="muro-vacio">
+                        <div class="vacio-icono">🍺</div>
+                        <h3>No hay canillas registradas</h3>
+                        <p>Completa el formulario de alta para comenzar a servir cerveza en el muro.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            canillas.forEach(canilla => {
+                const tarjeta = document.createElement('article');
+                tarjeta.className = 'tarjeta-canilla';
+
+                // Determinar clase del badge según estado
+                const estado = (canilla.estado || 'Inactiva').trim();
+                const estadoLower = estado.toLowerCase();
+                let badgeClass = 'badge-inactiva';
+                if (estadoLower === 'activa' || estadoLower === 'disponible') {
+                    badgeClass = 'badge-activa';
+                } else if (estadoLower === 'mantenimiento' || estadoLower === 'limpieza') {
+                    badgeClass = 'badge-mantenimiento';
+                }
+
+                const numero = canilla.numero !== undefined ? canilla.numero : (canilla.id_canilla || '-');
+                const estilo = canilla.estilo || canilla.estilo_cerveza || 'Cerveza Artesanal';
+                const variedad = canilla.variedad || 'Ombú Selección';
+                const fecha = canilla.fecha_alta ? new Date(canilla.fecha_alta).toLocaleDateString('es-AR') : 'Disponible';
+
+                tarjeta.innerHTML = `
+                    <div class="tarjeta-header">
+                        <span class="canilla-numero"><span class="tap-icon">🚰</span> Canilla #${numero}</span>
+                        <span class="badge ${badgeClass}">${estado}</span>
+                    </div>
+                    <div class="tarjeta-body">
+                        <h3 class="canilla-estilo">${estilo}</h3>
+                        <p class="canilla-variedad">${variedad}</p>
+                    </div>
+                    <div class="tarjeta-footer">
+                        <span>Alta: ${fecha}</span>
+                        <span>Auto-servicio NFC</span>
+                    </div>
+                `;
+
+                muroCanillas.appendChild(tarjeta);
+            });
+        }
+
+        // Interceptar el evento submit del formulario
+        formCanilla.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            ocultarAlertas();
+
+            const numeroVal = document.getElementById('numero').value;
+            const estiloVal = document.getElementById('estilo').value.trim();
+            const variedadVal = document.getElementById('variedad').value.trim();
+            const estadoVal = document.getElementById('estado').value.trim();
+
+            const datos = {
+                numero: numeroVal !== '' ? Number(numeroVal) : '',
+                estilo: estiloVal,
+                variedad: variedadVal,
+                estado: estadoVal
+            };
+
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(datos)
+                });
+
+                if (response.status === 201) {
+                    // 201 Created: mostrar mensaje de éxito en verde, resetear formulario y actualizar lista
+                    const data = await response.json().catch(() => ({ message: 'Canilla creada exitosamente' }));
+                    alertaExito.textContent = data.message || 'Canilla creada exitosamente';
+                    alertaExito.style.display = 'block';
+                    alertaError.style.display = 'none';
+                    formCanilla.reset();
+                    await cargarCanillas();
+                } else if (response.status === 400) {
+                    // 400 Bad Request: mostrar alerta roja con el mensaje exacto retornado por el backend
+                    const data = await response.json().catch(() => ({ error: 'Faltan campos obligatorios' }));
+                    alertaError.textContent = data.error || data.message || 'Error en los datos enviados';
+                    alertaError.style.display = 'block';
+                    alertaExito.style.display = 'none';
+                } else {
+                    // Otros códigos de error
+                    const data = await response.json().catch(() => ({ error: `Error del servidor (${response.status})` }));
+                    alertaError.textContent = data.error || data.message || `Error del servidor (${response.status})`;
+                    alertaError.style.display = 'block';
+                    alertaExito.style.display = 'none';
+                }
+            } catch (error) {
+                console.error('Error en fetch POST:', error);
+                alertaError.textContent = 'Error de conexión con el servidor: ' + error.message;
+                alertaError.style.display = 'block';
+                alertaExito.style.display = 'none';
+            }
+        });
+
+        // Carga inicial de canillas
+        document.addEventListener('DOMContentLoaded', cargarCanillas);
+    </script>
+</body>
+</html>
