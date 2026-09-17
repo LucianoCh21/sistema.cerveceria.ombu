@@ -546,6 +546,60 @@ body {
     color: var(--text-muted);
 }
 
+/* ==========================================================================
+   ESTADOS DINÁMICOS: CARGA (SPINNER), VACÍO Y ERROR (Ombú Tap Wall Theme)
+   ========================================================================== */
+
+/* Contenedor centralizado para el estado de carga (loader) */
+.muro-loader {
+    grid-column: 1 / -1;
+    min-height: 220px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.85rem;
+    padding: 3rem 1.5rem;
+    background-color: var(--bg-surface);
+    border: 1px dashed var(--border-light);
+    border-radius: var(--radius-lg);
+    text-align: center;
+    transition: var(--transition);
+}
+
+/* Spinner temático con giro fluido y acento en tono dorado/ámbar cervecero */
+.spinner-cervecero {
+    width: 46px;
+    height: 46px;
+    border: 3.5px solid rgba(255, 255, 255, 0.08);
+    border-top-color: var(--primary);
+    border-right-color: var(--primary-hover);
+    border-radius: 50%;
+    animation: rotarSpinner 0.8s linear infinite;
+    box-shadow: var(--shadow-glow);
+}
+
+@keyframes rotarSpinner {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+.loader-texto {
+    color: var(--text-primary);
+    font-size: 1rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+}
+
+.loader-subtexto {
+    color: var(--text-muted);
+    font-size: 0.82rem;
+}
+
 /* Estado vacío en el muro */
 .muro-vacio {
     grid-column: 1 / -1;
@@ -565,6 +619,53 @@ body {
 .muro-vacio p {
     font-size: 0.95rem;
     color: var(--text-muted);
+}
+
+/* Estado de error temático en el muro */
+.muro-vacio.muro-error {
+    border-color: var(--color-error-border);
+    background-color: rgba(239, 68, 68, 0.04);
+}
+
+.muro-vacio.muro-error .error-icono {
+    font-size: 2.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.muro-vacio.muro-error h3 {
+    color: #f87171;
+    font-size: 1.15rem;
+    margin-bottom: 0.35rem;
+}
+
+.muro-vacio.muro-error p {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    max-width: 500px;
+    margin: 0 auto 1.25rem auto;
+}
+
+/* Botón interactivo de reintento de conexión */
+.btn-reintentar {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1.2rem;
+    background: linear-gradient(135deg, var(--bg-card), var(--bg-card-hover));
+    color: var(--primary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.btn-reintentar:hover {
+    border-color: var(--primary);
+    background: var(--bg-card-hover);
+    box-shadow: var(--shadow-glow);
+    transform: translateY(-2px);
 }
 
 /* Responsive */

@@ -131,14 +131,21 @@
                 </section>
 
                 <!-- Sección Canillas Registradas -->
-                <section class="section-canillas">
+                <section class="section-canillas" aria-labelledby="titulo-canillas">
                     <div class="section-header">
-                        <h2>Canillas Registradas</h2>
-                        <span id="contador-canillas" class="counter">0 canillas</span>
+                        <h2 id="titulo-canillas">Canillas Registradas</h2>
+                        <span id="contador-canillas" class="counter">Consultando servidor...</span>
                     </div>
 
-                    <!-- Contenedor id="muro-canillas" con clase 'muro-canillas' -->
-                    <div id="muro-canillas" class="muro-canillas"></div>
+                    <!-- Contenedor Ancla Dinámico (Arquitectura Desacoplada) -->
+                    <div id="muro-canillas" class="muro-canillas" aria-live="polite" aria-busy="true">
+                        <!-- Estado visual inicial de carga -->
+                        <div class="muro-loader" role="status">
+                            <div class="spinner-cervecero" aria-hidden="true"></div>
+                            <p class="loader-texto">Cargando registros del servidor...</p>
+                            <span class="loader-subtexto">Sincronizando tap wall en tiempo real</span>
+                        </div>
+                    </div>
                 </section>
             </div>
         </main>
@@ -154,7 +161,18 @@
         const muroCanillas = document.getElementById('muro-canillas');
         const contadorCanillas = document.getElementById('contador-canillas');
 
-        // Función para ocultar y limpiar alertas
+        // Función utilitaria de sanitización para prevenir XSS en contenido inyectado
+        function escapeHTML(str) {
+            if (typeof str !== 'string') return str;
+            return str
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        // Función para ocultar y limpiar alertas del formulario
         function ocultarAlertas() {
             alertaExito.style.display = 'none';
             alertaError.style.display = 'none';
@@ -162,35 +180,102 @@
             alertaError.textContent = '';
         }
 
-        // Consultar (GET) la lista de canillas y dibujarlas dinámicamente en el muro de tarjetas
-        async function cargarCanillas() {
-            try {
-                const response = await fetch(API_URL);
-                if (!response.ok) {
-                    throw new Error(`Error en la consulta: ${response.status} ${response.statusText}`);
-                }
-                const canillas = await response.json();
-                dibujarMuroCanillas(canillas);
-            } catch (error) {
-                console.error('Error al consultar canillas:', error);
-                if (!muroCanillas.hasChildNodes() || muroCanillas.children.length === 0) {
-                    muroCanillas.innerHTML = `
-                        <div class="muro-vacio">
-                            <div class="vacio-icono">🍺</div>
-                            <h3>Sin conexión con el muro de canillas</h3>
-                            <p>No se pudo conectar con el servidor backend en http://localhost:3000.</p>
-                        </div>
-                    `;
-                }
+        /**
+         * Renderiza el estado visual de carga en el contenedor ancla (loading spinner)
+         */
+        function mostrarCargando() {
+            muroCanillas.setAttribute('aria-busy', 'true');
+            if (contadorCanillas) {
+                contadorCanillas.textContent = 'Consultando servidor...';
+            }
+
+            muroCanillas.innerHTML = `
+                <div class="muro-loader" role="status">
+                    <div class="spinner-cervecero" aria-hidden="true"></div>
+                    <p class="loader-texto">Cargando registros del servidor...</p>
+                    <span class="loader-subtexto">Sincronizando tap wall en tiempo real</span>
+                </div>
+            `;
+        }
+
+        /**
+         * Renderiza el estado visual de error en el contenedor ancla
+         * Resuelve deterministamente el reemplazo del loader ante fallos de conexión
+         */
+        function mostrarError(mensajeDetalle) {
+            muroCanillas.setAttribute('aria-busy', 'false');
+            if (contadorCanillas) {
+                contadorCanillas.textContent = 'Sin conexión';
+            }
+
+            muroCanillas.innerHTML = `
+                <div class="muro-vacio muro-error" role="alert">
+                    <div class="error-icono">⚠️</div>
+                    <h3>Error de conexión con el Tap Wall</h3>
+                    <p>${escapeHTML(mensajeDetalle || 'No se pudo establecer conexión con el servidor backend en http://localhost:3000.')}</p>
+                    <button type="button" class="btn-reintentar" id="btn-reintentar-carga">
+                        <span>🔄</span> Reintentar conexión
+                    </button>
+                </div>
+            `;
+
+            // Asignar listener interactivo al botón de reintento
+            const btnReintentar = document.getElementById('btn-reintentar-carga');
+            if (btnReintentar) {
+                btnReintentar.addEventListener('click', () => {
+                    cargarCanillas();
+                });
             }
         }
 
-        // Renderizado dinámico de las tarjetas en el muro
+        /**
+         * Genera el elemento de tarjeta para una canilla individual
+         */
+        function crearTarjetaCanilla(canilla) {
+            const estado = (canilla.estado || 'Inactiva').trim();
+            const estadoLower = estado.toLowerCase();
+            let badgeClass = 'badge-inactiva';
+            if (estadoLower === 'activa' || estadoLower === 'disponible') {
+                badgeClass = 'badge-activa';
+            } else if (estadoLower === 'mantenimiento' || estadoLower === 'limpieza') {
+                badgeClass = 'badge-mantenimiento';
+            }
+
+            const numero = canilla.numero !== undefined ? canilla.numero : (canilla.id_canilla || '-');
+            const estilo = canilla.estilo || canilla.estilo_cerveza || 'Cerveza Artesanal';
+            const variedad = canilla.variedad || 'Ombú Selección';
+            const fecha = canilla.fecha_alta ? new Date(canilla.fecha_alta).toLocaleDateString('es-AR') : 'Disponible';
+
+            const tarjeta = document.createElement('article');
+            tarjeta.className = 'tarjeta-canilla';
+            tarjeta.setAttribute('data-id', canilla.id_canilla || canilla.id || numero);
+            tarjeta.innerHTML = `
+                <div class="tarjeta-header">
+                    <span class="canilla-numero"><span class="tap-icon">🚰</span> Canilla #${escapeHTML(String(numero))}</span>
+                    <span class="badge ${badgeClass}">${escapeHTML(estado)}</span>
+                </div>
+                <div class="tarjeta-body">
+                    <h3 class="canilla-estilo">${escapeHTML(estilo)}</h3>
+                    <p class="canilla-variedad">${escapeHTML(variedad)}</p>
+                </div>
+                <div class="tarjeta-footer">
+                    <span>Alta: ${escapeHTML(fecha)}</span>
+                    <span>Auto-servicio NFC</span>
+                </div>
+            `;
+            return tarjeta;
+        }
+
+        /**
+         * Renderizado dinámico de las tarjetas en el muro
+         */
         function dibujarMuroCanillas(canillas) {
+            muroCanillas.setAttribute('aria-busy', 'false');
             muroCanillas.innerHTML = '';
 
             if (contadorCanillas) {
-                contadorCanillas.textContent = `${canillas.length} canilla${canillas.length === 1 ? '' : 's'}`;
+                const total = Array.isArray(canillas) ? canillas.length : 0;
+                contadorCanillas.textContent = `${total} canilla${total === 1 ? '' : 's'}`;
             }
 
             if (!Array.isArray(canillas) || canillas.length === 0) {
@@ -204,42 +289,30 @@
                 return;
             }
 
+            // Inyección atómica con DocumentFragment para alto rendimiento en el DOM
+            const fragment = document.createDocumentFragment();
             canillas.forEach(canilla => {
-                const tarjeta = document.createElement('article');
-                tarjeta.className = 'tarjeta-canilla';
-
-                // Determinar clase del badge según estado
-                const estado = (canilla.estado || 'Inactiva').trim();
-                const estadoLower = estado.toLowerCase();
-                let badgeClass = 'badge-inactiva';
-                if (estadoLower === 'activa' || estadoLower === 'disponible') {
-                    badgeClass = 'badge-activa';
-                } else if (estadoLower === 'mantenimiento' || estadoLower === 'limpieza') {
-                    badgeClass = 'badge-mantenimiento';
-                }
-
-                const numero = canilla.numero !== undefined ? canilla.numero : (canilla.id_canilla || '-');
-                const estilo = canilla.estilo || canilla.estilo_cerveza || 'Cerveza Artesanal';
-                const variedad = canilla.variedad || 'Ombú Selección';
-                const fecha = canilla.fecha_alta ? new Date(canilla.fecha_alta).toLocaleDateString('es-AR') : 'Disponible';
-
-                tarjeta.innerHTML = `
-                    <div class="tarjeta-header">
-                        <span class="canilla-numero"><span class="tap-icon">🚰</span> Canilla #${numero}</span>
-                        <span class="badge ${badgeClass}">${estado}</span>
-                    </div>
-                    <div class="tarjeta-body">
-                        <h3 class="canilla-estilo">${estilo}</h3>
-                        <p class="canilla-variedad">${variedad}</p>
-                    </div>
-                    <div class="tarjeta-footer">
-                        <span>Alta: ${fecha}</span>
-                        <span>Auto-servicio NFC</span>
-                    </div>
-                `;
-
-                muroCanillas.appendChild(tarjeta);
+                fragment.appendChild(crearTarjetaCanilla(canilla));
             });
+            muroCanillas.appendChild(fragment);
+        }
+
+        /**
+         * Ciclo de vida asíncrono: Loader inicial -> Fetch GET -> Renderizado dinámico / Manejo de error
+         */
+        async function cargarCanillas() {
+            mostrarCargando();
+            try {
+                const response = await fetch(API_URL);
+                if (!response.ok) {
+                    throw new Error(`El servidor respondió con código ${response.status} (${response.statusText || 'Error en la petición'})`);
+                }
+                const canillas = await response.json();
+                dibujarMuroCanillas(canillas);
+            } catch (error) {
+                console.error('Error al consultar canillas:', error);
+                mostrarError('No se pudo establecer conexión con el tap wall (servidor no disponible o fuera de línea).');
+            }
         }
 
         // Interceptar el evento submit del formulario
