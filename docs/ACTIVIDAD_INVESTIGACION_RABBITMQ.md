@@ -21,10 +21,14 @@
 A diferencia de los protocolos tradicionales de mensajería directa punto a punto (como sockets TCP o llamadas síncronas HTTP), el modelo conceptual de RabbitMQ introduce una capa de mediación que separa de forma estricta la producción del mensaje de su destino final.
 
 ```
-┌──────────────┐     Mensaje + Routing Key     ┌──────────────┐    Binding Key    ┌──────────────┐     Pull / Push     ┌──────────────┐
-│  Productor   │ ────────────────────────────> │   Exchange   │ ────────────────> │     Cola     │ ──────────────────> │  Consumidor  │
-│  (Producer)  │                               │(Intercambio) │                   │   (Queue)    │                     │  (Consumer)  │
-└──────────────┘                               └──────────────┘                   └──────────────┘                     └──────────────┘
+┌───────────┐     Mensaje + Routing Key     ┌───────────┐
+│ Productor │ ────────────────────────────> │ Exchange  │
+└───────────┘                               └─────┬─────┘
+                                                  │ Binding Key
+                                                  ▼
+┌────────────┐         Pull / Push          ┌─────┴─────┐
+│ Consumidor │ <─────────────────────────── │   Cola    │
+└────────────┘                              └───────────┘
 ```
 
 ### Componentes Clave y su Interacción Técnica
@@ -67,23 +71,27 @@ A diferencia de llamadas HTTP que fallan si el receptor no responde en pocos seg
 Trasladamos la arquitectura de mensajería a nuestro sistema de gestión para **Ombú (Cervecería de Barrio)**, enfocado en el muro de canillas autoservicio NFC.
 
 ```
-┌───────────────────────────────── ARQUITECTURA DE MENSAJERÍA (OMBÚ TAP WALL) ─────────────────────────────────┐
-│ [ MÓDULO LECTURAS NFC ] (Lucrecia - Productor)             [ MÓDULO BARRILES Y STOCK ] (Chesani - Consumidor)│
-│   Terminal NFC ──> API Despachos (Node.js)                    Dashboard Stock <── Worker Stock (Node.js)     │
-│                           │                                                               ▲                  │
-│                           │ 1. Publica evento JSON                                        │ 3. basic.ack     │
-│                           ▼                                                               │ (Consumo seguro) │
-│                ┌─────────────────────┐   Routing Key: 'despacho.confirmado'   ┌───────────┴──────────┐       │
-│                │ Exchange (Topic)    │ ─────────────────────────────────────> │ Cola Durable         │       │
-│                │ 'ombu.eventos'      │                                        │'stock.despachos.queue│       │
-│                └──────────┬──────────┘                                        └───────────┬──────────┘       │
-│                           │ (Fallo reiterado > 3 / basic.nack)                            │                  │
-│                           ▼                                                               ▼                  │
-│                ┌─────────────────────┐                                        ┌──────────────────────┐       │
-│                │ Dead Letter Ex (DLX)│ ─────────────────────────────────────> │ DLQ 'stock.error.dlq'│       │
-│                │ 'ombu.dlx'          │                                        └──────────────────────┘       │
-│                └─────────────────────┘                                                                       │
-└──────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│           ARQUITECTURA DE MENSAJERÍA - CERVECERÍA OMBÚ          │
+├────────────────────────────────┬────────────────────────────────┤
+│ [MÓDULO LECTURAS NFC]          │ [MÓDULO BARRILES Y STOCK]      │
+│ (Lucrecia - Productor)         │ (Chesani - Consumidor)         │
+│                                │                                │
+│ Terminal NFC ──> API Despachos │ Dashboard Stock <── Worker     │
+│                        │       │                       ▲        │
+│    1. Publica evento   │       │          3. basic.ack │        │
+│       JSON             ▼       │             (Consumo) │        │
+│             ┌────────────────┐ │       ┌───────────────┴┐       │
+│             │ Exchange Topic │ ├──────>│  Cola Durable  │       │
+│             │ 'ombu.eventos' │ │       │'stock.despachos│       │
+│             └───────┬────────┘ │       └───────┬────────┘       │
+│   (Fallo > 3)       │          │               │                │
+│                     ▼          │               ▼                │
+│             ┌────────────────┐ │       ┌────────────────┐       │
+│             │  Exchange DLX  │ ├──────>│  DLQ Fallidos  │       │
+│             │   'ombu.dlx'   │ │       │'stock.error.dlq│       │
+│             └────────────────┘ │       └────────────────┘       │
+└────────────────────────────────┴────────────────────────────────┘
 ```
 
 ### 1. Identificación del Evento de Negocio
@@ -100,14 +108,8 @@ Trasladamos la arquitectura de mensajería a nuestro sistema de gestión para **
   "idempotencyKey": "idem-nfc-tap-884920-c3",
   "producer": "modulo-nfc-despachos",
   "data": {
-    "idDespacho": 105,
-    "idCanilla": 3,
-    "volumenLitros": 0.500,
-    "mililitros": 500,
-    "formato": "Pinta",
-    "importeDebitado": 2500.00,
-    "idTarjeta": 14,
-    "idCliente": 2
+    "idDespacho": 105, "idCanilla": 3, "volumenLitros": 0.500, "formato": "Pinta",
+    "importeDebitado": 2500.00, "idTarjeta": 14, "idCliente": 2
   }
 }
 ```
@@ -131,18 +133,13 @@ En sistemas de misión crítica como el control de inventario y facturación de 
 2. **Control de Idempotencia en el Consumidor:**
    Dado que RabbitMQ garantiza entrega *al menos una vez* (*at-least-once delivery*), un fallo de red durante el envío del `ack` provocaría que el mensaje se reenvíe. Para evitar descontar litros dos veces por el mismo despacho, el consumidor implementa un control de unicidad:
    ```sql
-   -- Verificación de idempotencia atómica en SQL Server
+   -- Control de idempotencia atómico en SQL Server
    IF NOT EXISTS (SELECT 1 FROM DespachoProcesadoStock WHERE id_despacho = @idDespacho)
    BEGIN
        BEGIN TRANSACTION;
-           -- Descontar litros del barril conectado a la canilla indicada
-           UPDATE Barril 
-           SET litros_restantes = litros_restantes - @volumenLitros 
+           UPDATE Barril SET litros_restantes = litros_restantes - @volumenLitros 
            WHERE id_canilla = @idCanilla AND estado = 'Conectado';
-
-           -- Registrar auditoría del despacho ya aplicado
-           INSERT INTO DespachoProcesadoStock (id_despacho, fecha_procesado) 
-           VALUES (@idDespacho, GETDATE());
+           INSERT INTO DespachoProcesadoStock (id_despacho, fecha_procesado) VALUES (@idDespacho, GETDATE());
        COMMIT TRANSACTION;
    END
    ```
