@@ -1,0 +1,351 @@
+openapi: 3.0.3
+info:
+  title: API de Lecturas NFC y Despachos - Cervecería Ombú
+  description: >
+    Especificación OpenAPI 3.0 para el Módulo de Lecturas NFC y Despachos (AE2 - Responsable: Lucrecia Sabrina Mencia).
+    Este módulo gestiona la autenticación de tarjetas en terminales de canillas, la administración de sesiones
+    efímeras en Redis (con TTL de 45 segundos), el cobro idempotente y la emisión del evento asíncrono
+    'DespachoRealizado' hacia RabbitMQ para el control de inventario de barriles.
+  version: 1.0.0
+  contact:
+    name: Lucrecia Sabrina Mencia
+    email: grupo1@ombu.cerveceria.com
+
+servers:
+  - url: http://localhost:3000
+    description: Servidor de desarrollo local
+
+tags:
+  - name: NFC
+    description: Operaciones de aproximación de tarjetas y sesiones temporales
+  - name: Despachos
+    description: Cobro de consumos, idempotencia y registro transaccional
+
+paths:
+  /api/nfc/autenticar:
+    post:
+      tags:
+        - NFC
+      summary: Autenticar tarjeta física NFC e iniciar sesión efímera en Redis
+      description: >
+        Invocado cuando un cliente aproxima su tarjeta NFC al lector de una canilla física.
+        Verifica en SQL Server que la tarjeta exista, esté activa y cuente con saldo positivo.
+        Si es válida, crea una sesión temporal en Redis (clave `nfc:sesion:{uid}`) con un TTL estricto
+        de 45 segundos para autorizar la apertura del grifo.
+      operationId: autenticarTarjetaNFC
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AutenticarNFCRequest'
+      responses:
+        '200':
+          description: Tarjeta autorizada y sesión efímera iniciada en Redis
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AutenticarNFCResponse'
+        '400':
+          description: Datos de entrada incompletos o malformados
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '402':
+          description: Saldo insuficiente en la tarjeta para iniciar consumo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Tarjeta no registrada o dada de baja
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error interno del servidor o conexión a base de datos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/despachos:
+    post:
+      tags:
+        - Despachos
+      summary: Procesar débito del cliente, registrar despacho y emitir evento a RabbitMQ
+      description: >
+        Procesa el servido final del cliente. Valida que exista una sesión activa en Redis para la tarjeta.
+        Ejecuta la transacción en SQL Server debitando el saldo e insertando el registro en la tabla `Despacho`.
+        Implementa control estricto de idempotencia mediante la cabecera `Idempotency-Key`.
+        Tras confirmar la transacción, elimina la sesión en Redis y publica el evento `DespachoRealizado`
+        en el exchange `ombu.eventos` de RabbitMQ de forma asíncrona.
+      operationId: crearDespacho
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          description: Identificador único universal generado por el cliente/terminal para evitar dobles cobros accidentales.
+          schema:
+            type: string
+            example: idem-nfc-canilla3-1727123456
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DespachoRequest'
+      responses:
+        '201':
+          description: Despacho completado con éxito y evento publicado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DespachoResponse'
+        '200':
+          description: Solicitud duplicada resuelta por Idempotencia (devuelve resultado previo sin volver a debitar)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DespachoResponse'
+        '400':
+          description: Petición inválida o formato de cerveza no soportado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Sesión expirada en Redis (transcurrieron más de 45s desde el tap)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Canilla o tarjeta no encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error transaccional en base de datos o fallo crítico
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/despachos/{id}/comprobante:
+    get:
+      tags:
+        - Despachos
+      summary: Generar y descargar ticket comprobante en formato PDF
+      description: Construye un documento PDF al vuelo con el detalle de la consumición, canilla, fecha y saldo restante.
+      operationId: obtenerComprobantePDF
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Identificador numérico del despacho registrado
+          schema:
+            type: integer
+            example: 105
+      responses:
+        '200':
+          description: Documento PDF del ticket de consumo
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Despacho no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    AutenticarNFCRequest:
+      type: object
+      required:
+        - uid_tarjeta
+        - id_canilla
+      properties:
+        uid_tarjeta:
+          type: string
+          example: "E2801191A0000000"
+          description: UID hexadecimal leído por el sensor NFC físico
+        id_canilla:
+          type: integer
+          example: 3
+          description: Número de la canilla en el muro de autoservicio
+
+    AutenticarNFCResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          example: true
+        sesionValida:
+          type: boolean
+          example: true
+        uid_tarjeta:
+          type: string
+          example: "E2801191A0000000"
+        id_tarjeta:
+          type: integer
+          example: 14
+        id_cliente:
+          type: integer
+          example: 2
+        cliente_nombre:
+          type: string
+          example: "Carlos Gómez"
+        saldo_disponible:
+          type: number
+          format: float
+          example: 5200.00
+        id_canilla:
+          type: integer
+          example: 3
+        ttl_segundos:
+          type: integer
+          example: 45
+          description: Tiempo de gracia en segundos antes de que expire la habilitación del grifo en Redis
+
+    DespachoRequest:
+      type: object
+      required:
+        - uid_tarjeta
+        - id_canilla
+        - formato
+        - mililitros
+        - importe
+      properties:
+        uid_tarjeta:
+          type: string
+          example: "E2801191A0000000"
+        id_canilla:
+          type: integer
+          example: 3
+        formato:
+          type: string
+          enum: ["Media Pinta", "Pinta", "Litro"]
+          example: "Pinta"
+        mililitros:
+          type: integer
+          enum: [250, 500, 1000]
+          example: 500
+        importe:
+          type: number
+          format: float
+          example: 2500.00
+
+    DespachoResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          example: true
+        id_despacho:
+          type: integer
+          example: 105
+        id_canilla:
+          type: integer
+          example: 3
+        formato:
+          type: string
+          example: "Pinta"
+        volumen_litros:
+          type: number
+          format: float
+          example: 0.500
+        importe_debitado:
+          type: number
+          format: float
+          example: 2500.00
+        saldo_restante:
+          type: number
+          format: float
+          example: 2700.00
+        comprobante_url:
+          type: string
+          example: "/api/despachos/105/comprobante"
+        evento_rabbit_publicado:
+          type: boolean
+          example: true
+        fecha_hora:
+          type: string
+          format: date-time
+          example: "2026-09-23T20:15:30.120Z"
+
+    DespachoRealizadoEvent:
+      type: object
+      description: Contrato del mensaje publicado al Exchange 'ombu.eventos' con routing key 'despacho.confirmado'
+      properties:
+        eventId:
+          type: string
+          example: "evt-77f9c2d1-4e8b-4a56-91e2-b88301fa3201"
+        eventType:
+          type: string
+          example: "DespachoRealizado"
+        occurredAt:
+          type: string
+          format: date-time
+          example: "2026-09-23T20:15:30.120Z"
+        version:
+          type: string
+          example: "1.0"
+        idempotencyKey:
+          type: string
+          example: "idem-nfc-canilla3-1727123456"
+        producer:
+          type: string
+          example: "modulo-nfc-despachos"
+        data:
+          type: object
+          properties:
+            idDespacho:
+              type: integer
+              example: 105
+            idCanilla:
+              type: integer
+              example: 3
+            volumenLitros:
+              type: number
+              format: float
+              example: 0.500
+            mililitros:
+              type: integer
+              example: 500
+            formato:
+              type: string
+              example: "Pinta"
+            importeDebitado:
+              type: number
+              format: float
+              example: 2500.00
+            idTarjeta:
+              type: integer
+              example: 14
+            idCliente:
+              type: integer
+              example: 2
+
+    ErrorResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          example: false
+        error:
+          type: string
+          example: "Sesión efímera expirada en el grifo (TTL 45s agotado)."
+        codigo:
+          type: string
+          example: "SESSION_EXPIRED"
+        detalles:
+          type: string
+          example: "Debe volver a aproximar la tarjeta al lector para reactivar el grifo."
