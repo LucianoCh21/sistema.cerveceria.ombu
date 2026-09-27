@@ -4,14 +4,17 @@ const { setNfcSession, getNfcSession } = require('../config/redis');
 /**
  * Autentica la aproximación de una tarjeta física NFC a una canilla y crea sesión efímera en Redis.
  * Cumple con RN-02: TTL de 45 segundos de apertura de grifo.
+ * Adaptado a OmbuDB (soporta tarjetas nominadas y anónimas con id_tarjeta VARCHAR y saldo_actual).
  */
 const autenticarTarjeta = async (req, res) => {
-    const { uid_tarjeta, id_canilla } = req.body;
+    // Acepta id_tarjeta o uid_tarjeta por retrocompatibilidad
+    const idTarjeta = req.body.id_tarjeta || req.body.uid_tarjeta;
+    const { id_canilla } = req.body;
 
-    if (!uid_tarjeta || id_canilla === undefined) {
+    if (!idTarjeta || id_canilla === undefined) {
         return res.status(400).json({
             ok: false,
-            error: "Faltan parámetros obligatorios: uid_tarjeta e id_canilla son requeridos.",
+            error: "Faltan parámetros obligatorios: id_tarjeta (o uid_tarjeta) e id_canilla son requeridos.",
             codigo: "MISSING_PARAMETERS"
         });
     }
@@ -19,24 +22,22 @@ const autenticarTarjeta = async (req, res) => {
     try {
         const pool = await getConnection();
 
-        // 1. Validar existencia y estado de la tarjeta y cliente en SQL Server
+        // 1. Validar existencia y estado de la tarjeta y cliente en SQL Server (LEFT JOIN para admitir tarjetas anónimas)
         const queryTarjeta = `
             SELECT 
                 t.id_tarjeta,
-                t.uid_tarjeta,
-                t.saldo,
+                t.saldo_actual,
                 t.estado AS estado_tarjeta,
                 c.id_cliente,
                 c.nombre,
-                c.apellido,
-                c.estado AS estado_cliente
+                c.apellido
             FROM TarjetaNFC t
-            INNER JOIN Cliente c ON t.id_cliente = c.id_cliente
-            WHERE t.uid_tarjeta = @uid
+            LEFT JOIN Cliente c ON t.id_cliente = c.id_cliente
+            WHERE t.id_tarjeta = @id_tarjeta
         `;
 
         const result = await pool.request()
-            .input('uid', sql.VarChar, uid_tarjeta)
+            .input('id_tarjeta', sql.VarChar(32), idTarjeta)
             .query(queryTarjeta);
 
         if (result.recordset.length === 0) {
@@ -49,7 +50,7 @@ const autenticarTarjeta = async (req, res) => {
 
         const tarjeta = result.recordset[0];
 
-        // 2. Validar que la tarjeta y el cliente no estén dados de baja
+        // 2. Validar que la tarjeta no esté dada de baja ni bloqueada
         if (tarjeta.estado_tarjeta !== 'Activa') {
             return res.status(403).json({
                 ok: false,
@@ -58,38 +59,44 @@ const autenticarTarjeta = async (req, res) => {
             });
         }
 
-        // 3. Validar saldo mínimo para habilitar el grifo (ej. costo mínimo para media pinta)
-        if (tarjeta.saldo <= 0) {
+        // 3. Validar saldo mínimo para habilitar el grifo
+        const saldoDisponible = Number(tarjeta.saldo_actual);
+        if (saldoDisponible <= 0) {
             return res.status(402).json({
                 ok: false,
                 error: "Saldo insuficiente. Debe realizar una recarga antes de servirse.",
-                saldo_actual: tarjeta.saldo,
+                saldo_actual: saldoDisponible,
                 codigo: "INSUFFICIENT_FUNDS"
             });
         }
 
         // 4. Iniciar sesión efímera en Redis con TTL estricto de 45 segundos
         const ttlSegundos = 45;
+        const clienteNombre = tarjeta.nombre 
+            ? `${tarjeta.nombre} ${tarjeta.apellido}`.trim() 
+            : 'Consumidor Final / Anónimo';
+
         const sessionPayload = {
             id_tarjeta: tarjeta.id_tarjeta,
-            uid_tarjeta: tarjeta.uid_tarjeta,
-            id_cliente: tarjeta.id_cliente,
-            cliente_nombre: `${tarjeta.nombre} ${tarjeta.apellido}`.trim(),
+            uid_tarjeta: tarjeta.id_tarjeta, // Retrocompatibilidad
+            id_cliente: tarjeta.id_cliente || null,
+            cliente_nombre: clienteNombre,
             id_canilla: Number(id_canilla),
-            saldo_disponible: Number(tarjeta.saldo),
+            saldo_disponible: saldoDisponible,
             iniciado_en: new Date().toISOString()
         };
 
-        await setNfcSession(uid_tarjeta, sessionPayload, ttlSegundos);
+        // Guardar sesión en Redis usando el ID de la tarjeta
+        await setNfcSession(idTarjeta, sessionPayload, ttlSegundos);
 
         return res.status(200).json({
             ok: true,
             sesionValida: true,
-            uid_tarjeta: tarjeta.uid_tarjeta,
             id_tarjeta: tarjeta.id_tarjeta,
-            id_cliente: tarjeta.id_cliente,
-            cliente_nombre: sessionPayload.cliente_nombre,
-            saldo_disponible: sessionPayload.saldo_disponible,
+            uid_tarjeta: tarjeta.id_tarjeta,
+            id_cliente: tarjeta.id_cliente || null,
+            cliente_nombre: clienteNombre,
+            saldo_disponible: saldoDisponible,
             id_canilla: Number(id_canilla),
             ttl_segundos: ttlSegundos
         });
@@ -109,9 +116,9 @@ const autenticarTarjeta = async (req, res) => {
  * Consulta si una tarjeta tiene una sesión efímera vigente en Redis.
  */
 const consultarSesion = async (req, res) => {
-    const { uid } = req.params;
+    const uid = req.params.uid || req.params.id;
     if (!uid) {
-        return res.status(400).json({ ok: false, error: "UID de tarjeta no provisto." });
+        return res.status(400).json({ ok: false, error: "Identificador de tarjeta no provisto." });
     }
 
     try {
@@ -120,7 +127,7 @@ const consultarSesion = async (req, res) => {
             return res.status(404).json({
                 ok: false,
                 activa: false,
-                error: "No existe sesión activa para esta tarjeta (expiró o no fue autenticada)."
+                error: "No existe sesión activa para esta tarjeta (expiró o no fue aproximada)."
             });
         }
 
