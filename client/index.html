@@ -20,17 +20,17 @@
             </div>
 
             <nav class="sidebar-nav">
-                <a href="#" class="nav-link active">
+                <a href="#" class="nav-link active" id="nav-link-muro">
                     <span>🚰</span> Muro de Canillas
                 </a>
-                <a href="#panel-alta" class="nav-link">
+                <a href="#panel-alta" class="nav-link" id="nav-link-alta">
                     <span>➕</span> Alta de Canilla
                 </a>
-                <a href="#" class="nav-link">
+                <a href="#" class="nav-link" id="nav-link-stock">
                     <span>🛢️</span> Barriles y Stock
                 </a>
-                <a href="#" class="nav-link">
-                    <span>📲</span> Lecturas NFC
+                <a href="#terminal-nfc" class="nav-link" id="nav-link-nfc">
+                    <span>📲</span> Lecturas NFC (Tap Wall)
                 </a>
                 <a href="#" class="nav-link">
                     <span>⚙️</span> Configuración
@@ -39,7 +39,7 @@
 
             <div class="sidebar-footer">
                 <span class="badge-online">Sistema Online</span>
-                <p style="margin-top: 4px; font-size: 0.72rem;">Tap Wall Self-Service v1.0</p>
+                <p style="margin-top: 4px; font-size: 0.72rem;">Tap Wall Self-Service v2.0</p>
             </div>
         </aside>
 
@@ -52,10 +52,10 @@
                     <span class="separator">/</span>
                     <a href="#">Muro de Autoservicio</a>
                     <span class="separator">/</span>
-                    <span class="active">Gestión de Canillas</span>
+                    <span class="active" id="breadcrumb-active">Gestión de Canillas</span>
                 </nav>
                 <div class="topbar-actions">
-                    <span>Terminal: <strong>Barra Principal</strong></span>
+                    <span>Terminal: <strong>Barra Principal (NFC Habilitado)</strong></span>
                 </div>
             </header>
 
@@ -65,88 +65,260 @@
                 <div id="alerta-exito" class="alerta alerta-exito" role="alert"></div>
                 <div id="alerta-error" class="alerta alerta-error" role="alert"></div>
 
-                <!-- Panel Estilizado con Formulario de Alta -->
-                <section id="panel-alta" class="form-panel">
-                    <div class="panel-header">
-                        <h2><span>➕</span> Registrar Nueva Canilla</h2>
-                        <p>Configure los parámetros del nuevo grifo para integrarlo al muro de autoservicio NFC.</p>
-                    </div>
+                <!-- VISTA 1: GESTIÓN DE CANILLAS Y ALTA -->
+                <div id="vista-muro-gestion" class="vista-seccion">
+                    <!-- Panel Estilizado con Formulario de Alta -->
+                    <section id="panel-alta" class="form-panel">
+                        <div class="panel-header">
+                            <h2><span>➕</span> Registrar Nueva Canilla</h2>
+                            <p>Configure los parámetros del nuevo grifo para integrarlo al muro de autoservicio NFC.</p>
+                        </div>
 
-                    <form id="form-canilla" novalidate>
-                        <div class="form-grid">
-                            <!-- Número de Canilla -->
-                            <div class="form-group">
-                                <label for="numero">Número de Canilla</label>
-                                <input 
-                                    type="number" 
-                                    id="numero" 
-                                    name="numero" 
-                                    class="form-input" 
-                                    placeholder="Ej: 1" 
-                                    min="1"
-                                >
+                        <form id="form-canilla" novalidate>
+                            <div class="form-grid">
+                                <!-- Número de Canilla -->
+                                <div class="form-group">
+                                    <label for="numero">Número de Canilla</label>
+                                    <input 
+                                        type="number" 
+                                        id="numero" 
+                                        name="numero" 
+                                        class="form-input" 
+                                        placeholder="Ej: 1" 
+                                        min="1"
+                                    >
+                                </div>
+
+                                <!-- Estilo de Cerveza -->
+                                <div class="form-group">
+                                    <label for="estilo">Estilo de Cerveza</label>
+                                    <input 
+                                        type="text" 
+                                        id="estilo" 
+                                        name="estilo" 
+                                        class="form-input" 
+                                        placeholder="Ej: IPA, Scottish, Golden..."
+                                    >
+                                </div>
+
+                                <!-- Variedad -->
+                                <div class="form-group">
+                                    <label for="variedad">Variedad</label>
+                                    <input 
+                                        type="text" 
+                                        id="variedad" 
+                                        name="variedad" 
+                                        class="form-input" 
+                                        placeholder="Ej: Session, Honey, Black..."
+                                    >
+                                </div>
+
+                                <!-- Estado -->
+                                <div class="form-group">
+                                    <label for="estado">Estado Operativo</label>
+                                    <select id="estado" name="estado" class="form-select">
+                                        <option value="Activa">Activa</option>
+                                        <option value="Mantenimiento">Mantenimiento</option>
+                                        <option value="Inactiva">Inactiva</option>
+                                    </select>
+                                </div>
                             </div>
 
-                            <!-- Estilo de Cerveza -->
-                            <div class="form-group">
-                                <label for="estilo">Estilo de Cerveza</label>
-                                <input 
-                                    type="text" 
-                                    id="estilo" 
-                                    name="estilo" 
-                                    class="form-input" 
-                                    placeholder="Ej: IPA, Scottish, Golden..."
-                                >
+                            <div class="form-actions">
+                                <button type="submit" id="btn-submit" class="btn-primary">
+                                    <span>🍺</span> Registrar Canilla
+                                </button>
                             </div>
+                        </form>
+                    </section>
 
-                            <!-- Variedad -->
-                            <div class="form-group">
-                                <label for="variedad">Variedad</label>
-                                <input 
-                                    type="text" 
-                                    id="variedad" 
-                                    name="variedad" 
-                                    class="form-input" 
-                                    placeholder="Ej: Session, Honey, Black..."
-                                >
+                    <!-- Sección Canillas Registradas -->
+                    <section class="section-canillas" aria-labelledby="titulo-canillas">
+                        <div class="section-header">
+                            <h2 id="titulo-canillas">Canillas Registradas</h2>
+                            <span id="contador-canillas" class="counter">Consultando servidor...</span>
+                        </div>
+
+                        <!-- Contenedor Ancla Dinámico (Arquitectura Desacoplada) -->
+                        <div id="muro-canillas" class="muro-canillas" aria-live="polite" aria-busy="true">
+                            <!-- Estado visual inicial de carga -->
+                            <div class="muro-loader" role="status">
+                                <div class="spinner-cervecero" aria-hidden="true"></div>
+                                <p class="loader-texto">Cargando registros del servidor...</p>
+                                <span class="loader-subtexto">Sincronizando tap wall en tiempo real</span>
                             </div>
+                        </div>
+                    </section>
+                </div>
 
-                            <!-- Estado -->
-                            <div class="form-group">
-                                <label for="estado">Estado Operativo</label>
-                                <select id="estado" name="estado" class="form-select">
-                                    <option value="Activa">Activa</option>
-                                    <option value="Mantenimiento">Mantenimiento</option>
-                                    <option value="Inactiva">Inactiva</option>
-                                </select>
+                <!-- VISTA 2: TERMINAL DE AUTOSERVICIO TAP WALL NFC (DÍAS 3 & 5) -->
+                <div id="vista-terminal-nfc" class="vista-seccion oculta">
+                    <div class="terminal-nfc-wrapper">
+                        <!-- Cabecera de la Terminal -->
+                        <div class="terminal-header">
+                            <div class="terminal-header-info">
+                                <h2><span>📲</span> Terminal de Autoservicio — Tap Wall NFC</h2>
+                                <p>Aproxime su tarjeta al lector de la canilla seleccionada para habilitar el grifo.</p>
+                            </div>
+                            <div class="terminal-badge-ttl">
+                                <span>⏱️</span> TTL de Sesión: <strong>45 Segundos</strong>
                             </div>
                         </div>
 
-                        <div class="form-actions">
-                            <button type="submit" id="btn-submit" class="btn-primary">
-                                <span>🍺</span> Registrar Canilla
+                        <!-- Grid de Operación -->
+                        <div class="terminal-grid">
+                            <!-- Columna 1: Simulador de Hardware NFC -->
+                            <div class="nfc-simulator-card">
+                                <h3><span>🎛️</span> Panel de Lector NFC Físico</h3>
+
+                                <!-- Paso 1: Elegir Canilla -->
+                                <div class="canilla-select-group">
+                                    <label>1. Seleccione la Canilla Activa:</label>
+                                    <div id="canillas-selector-grid" class="canilla-selector-grid"></div>
+                                </div>
+
+                                <!-- Paso 2: Zona de Aproximación NFC -->
+                                <div class="canilla-select-group">
+                                    <label>2. Tarjeta NFC del Cliente:</label>
+                                    <div class="nfc-tap-zone">
+                                        <div class="nfc-tap-icon">📲</div>
+                                        <div style="font-size: 0.88rem; color: var(--text-secondary);">
+                                            Lector de Radiofrecuencia RFID / NFC 13.56 MHz
+                                        </div>
+                                        <div style="width: 100%;">
+                                            <input 
+                                                type="text" 
+                                                id="input-nfc-custom" 
+                                                class="form-input" 
+                                                placeholder="UID Físico (ej: A1B2C3D4E5)" 
+                                                value="A1B2C3D4E5"
+                                                style="text-align: center; font-family: monospace; font-weight: 700; letter-spacing: 0.1em;"
+                                            >
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Tarjetas de Prueba Rápida -->
+                                <div class="canilla-select-group">
+                                    <label style="font-size: 0.78rem;">Tarjetas de prueba (Click para seleccionar):</label>
+                                    <div id="preset-cards-list" class="preset-cards-list"></div>
+                                </div>
+
+                                <!-- Botón de Tap -->
+                                <button type="button" id="btn-tap-nfc" class="btn-tap-nfc">
+                                    <span>📲</span> Aproximar Tarjeta (Tap NFC)
+                                </button>
+                            </div>
+
+                            <!-- Columna 2: Grifo Habilitado y Cuenta Regresiva TTL 45s -->
+                            <div class="grifo-session-panel">
+                                <!-- Estado Standby (Sin sesión) -->
+                                <div id="session-standby" class="session-standby">
+                                    <div class="session-standby-icon">🚰</div>
+                                    <h3>Grifo Cerrado</h3>
+                                    <p>Esperando lectura de tarjeta NFC con saldo disponible...</p>
+                                </div>
+
+                                <!-- Animación de Servido (Llenado de Cerveza) -->
+                                <div id="pouring-animation" class="pouring-animation-container" style="display: none;">
+                                    <div class="beer-glass-animation">
+                                        <div class="beer-liquid">
+                                            <div class="beer-foam"></div>
+                                        </div>
+                                    </div>
+                                    <h3 style="color: var(--primary-light);">Sirviendo cerveza en el grifo...</h3>
+                                    <p style="color: var(--text-secondary); font-size: 0.85rem;">Débito atómico y descuento en barril en progreso</p>
+                                </div>
+
+                                <!-- Estado Activo (Sesión iniciada con TTL 45s) -->
+                                <div id="session-active-content" class="session-active-content" style="display: none;">
+                                    <div class="session-user-badge">
+                                        <div>
+                                            <div id="lbl-titular" class="user-titular">Juan Pérez</div>
+                                            <div id="lbl-uid" class="user-uid">NFC: A1B2C3D4E5</div>
+                                            <div id="lbl-canilla-activa" style="font-size: 0.8rem; color: var(--primary); margin-top: 0.2rem;">Canilla #1 — Caravana IPA</div>
+                                        </div>
+                                        <div class="session-user-saldo">
+                                            <div class="saldo-label">Saldo Disponible</div>
+                                            <div id="lbl-saldo" class="saldo-monto">$6.500,00</div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Contador Regresivo -->
+                                    <div id="countdown-box" class="countdown-box">
+                                        <div class="countdown-label">Tiempo de Apertura del Grifo (TTL Redis)</div>
+                                        <div id="countdown-number" class="countdown-number">45s</div>
+                                        <div class="countdown-progress-bar">
+                                            <div id="countdown-progress-fill" class="countdown-progress-fill"></div>
+                                        </div>
+                                        <div class="tap-status-banner">
+                                            <span>🟢</span> Grifo desbloqueado: sírvase antes de que expire la sesión
+                                        </div>
+                                    </div>
+
+                                    <!-- Selección de Formato y Servido (Día 5) -->
+                                    <div class="canilla-select-group">
+                                        <label>Seleccione el formato a servir:</label>
+                                        <div id="formatos-selector-grid" class="formatos-grid"></div>
+                                    </div>
+
+                                    <!-- Acción de Servir -->
+                                    <button type="button" id="btn-servir-cerveza" class="btn-servir-cerveza">
+                                        <span>🍺</span> Confirmar y Servir Cerveza
+                                    </button>
+
+                                    <button type="button" id="btn-cancelar-sesion" class="btn-cancelar-sesion">
+                                        Cancelar Sesión
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modal de Ticket / Comprobante PDF (Día 5) -->
+                <div id="ticket-modal" class="ticket-modal-overlay" style="display: none;">
+                    <div class="ticket-modal-card">
+                        <div class="ticket-header">
+                            <h3><span>✅</span> ¡Servido Exitoso!</h3>
+                            <p>Cervecería Ombú — Tap Wall Autoservicio</p>
+                        </div>
+                        <div class="ticket-body-table">
+                            <div class="ticket-row">
+                                <span>Despacho N°:</span>
+                                <span id="modal-id-despacho">#0</span>
+                            </div>
+                            <div class="ticket-row">
+                                <span>Cliente:</span>
+                                <span id="modal-cliente">-</span>
+                            </div>
+                            <div class="ticket-row">
+                                <span>Cerveza:</span>
+                                <span id="modal-cerveza">-</span>
+                            </div>
+                            <div class="ticket-row">
+                                <span>Formato / Volumen:</span>
+                                <span id="modal-formato">-</span>
+                            </div>
+                            <div class="ticket-row">
+                                <span>Importe Cobrado:</span>
+                                <span id="modal-importe" style="color: var(--primary);">$0,00</span>
+                            </div>
+                            <div class="ticket-row">
+                                <span>Nuevo Saldo en Tarjeta:</span>
+                                <span id="modal-saldo-restante" style="color: var(--color-success);">$0,00</span>
+                            </div>
+                        </div>
+                        <div class="ticket-actions">
+                            <button type="button" id="btn-descargar-pdf" class="btn-descargar-pdf">
+                                <span>📄</span> Descargar Comprobante PDF
+                            </button>
+                            <button type="button" id="btn-cerrar-modal" class="btn-cerrar-modal">
+                                Nuevo Servido
                             </button>
                         </div>
-                    </form>
-                </section>
-
-                <!-- Sección Canillas Registradas -->
-                <section class="section-canillas" aria-labelledby="titulo-canillas">
-                    <div class="section-header">
-                        <h2 id="titulo-canillas">Canillas Registradas</h2>
-                        <span id="contador-canillas" class="counter">Consultando servidor...</span>
                     </div>
-
-                    <!-- Contenedor Ancla Dinámico (Arquitectura Desacoplada) -->
-                    <div id="muro-canillas" class="muro-canillas" aria-live="polite" aria-busy="true">
-                        <!-- Estado visual inicial de carga -->
-                        <div class="muro-loader" role="status">
-                            <div class="spinner-cervecero" aria-hidden="true"></div>
-                            <p class="loader-texto">Cargando registros del servidor...</p>
-                            <span class="loader-subtexto">Sincronizando tap wall en tiempo real</span>
-                        </div>
-                    </div>
-                </section>
+                </div>
             </div>
         </main>
     </div>
@@ -374,8 +546,40 @@
             }
         });
 
+        // Navegación interactiva entre vistas (Muro de Canillas vs Terminal NFC)
+        const navMuro = document.getElementById('nav-link-muro');
+        const navAlta = document.getElementById('nav-link-alta');
+        const navNfc = document.getElementById('nav-link-nfc');
+        const vistaMuro = document.getElementById('vista-muro-gestion');
+        const vistaNfc = document.getElementById('vista-terminal-nfc');
+        const breadcrumbActive = document.getElementById('breadcrumb-active');
+
+        function activarVista(vista) {
+            if (vista === 'nfc') {
+                vistaMuro.classList.add('oculta');
+                vistaNfc.classList.remove('oculta');
+                navMuro?.classList.remove('active');
+                navAlta?.classList.remove('active');
+                navNfc?.classList.add('active');
+                if (breadcrumbActive) breadcrumbActive.textContent = 'Terminal Autoservicio NFC';
+            } else {
+                vistaNfc.classList.add('oculta');
+                vistaMuro.classList.remove('oculta');
+                navNfc?.classList.remove('active');
+                navMuro?.classList.add('active');
+                if (breadcrumbActive) breadcrumbActive.textContent = 'Gestión de Canillas';
+            }
+        }
+
+        navMuro?.addEventListener('click', (e) => { e.preventDefault(); activarVista('muro'); });
+        navAlta?.addEventListener('click', () => { activarVista('muro'); });
+        navNfc?.addEventListener('click', (e) => { e.preventDefault(); activarVista('nfc'); });
+
         // Carga inicial de canillas
         document.addEventListener('DOMContentLoaded', cargarCanillas);
     </script>
+
+    <!-- Módulo de Terminal de Autoservicio Tap Wall NFC (Días 3 y 5) -->
+    <script src="src/terminalNfc.js"></script>
 </body>
 </html>
