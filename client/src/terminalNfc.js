@@ -171,10 +171,14 @@ function asignarEventosNFC() {
         finalizarSesion('Servido finalizado con éxito.');
     });
 
-    // Descargar PDF de ticket
+    // Descargar PDF de ticket (Día 5)
     document.getElementById('btn-descargar-pdf')?.addEventListener('click', () => {
         if (terminalState.ultimoDespacho && terminalState.ultimoDespacho.id_despacho) {
-            window.open(`${API_BASE}/despachos/${terminalState.ultimoDespacho.id_despacho}/comprobante`, '_blank');
+            if (window.ComprobanteManager) {
+                window.ComprobanteManager.descargarArchivo(terminalState.ultimoDespacho.id_despacho);
+            } else {
+                window.open(`${API_BASE}/despachos/${terminalState.ultimoDespacho.id_despacho}/comprobante`, '_blank');
+            }
         }
     });
 }
