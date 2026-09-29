@@ -22,8 +22,17 @@ const iniciarConsumidor = async () => {
             if (msg !== null) {
                 try {
                     const messageContent = JSON.parse(msg.content.toString());
-                    const { idDespacho, idCanilla, volumenLitros } = messageContent.data;
+                    // 1. Extraes los datos originales enviados por Lucrecia
+                    const { idDespacho, idCanilla, volumenLitros } = JSON.parse(msg.content.toString()).data;
 
+                    // 2. Generas un factor aleatorio entre 1.00 (0%) y 1.10 (10%)
+                    const factorMerma = 1 + (Math.random() * 0.10);
+
+                    // 3. Calculas el volumen real a descontar del barril
+                    const volumenFinal = volumenLitros * factorMerma;
+
+                    // 4. Espía visual para la consola (formateado a 3 decimales)
+                    console.log(`🔎 [RABBITMQ] ID: ${idDespacho} | Pinta: ${volumenLitros}L | Descuento con merma: ${volumenFinal.toFixed(3)}L`);
                     const pool = await getConnection();
                     
                     // Crear la tabla de idempotencia si no existe
@@ -36,7 +45,8 @@ const iniciarConsumidor = async () => {
                         const request = new sql.Request(transaction);
                         request.input('idDespacho', sql.BigInt, idDespacho);
                         request.input('idCanilla', sql.Int, idCanilla);
-                        request.input('volumenLitros', sql.Decimal(10,2), volumenLitros);
+                        // CORRECCIÓN: Usamos volumenFinal en lugar de volumenLitros para aplicar la merma aleatoria
+                        request.input('volumenFinal', sql.Decimal(10,2), volumenFinal);
 
                         // Verificar idempotencia
                         const idempotencyCheck = await request.query("SELECT 1 FROM DespachoProcesadoStock WHERE id_despacho = @idDespacho");
@@ -48,8 +58,8 @@ const iniciarConsumidor = async () => {
                             return;
                         }
 
-                        // Actualizar litros restantes
-                        await request.query("UPDATE Barril SET litros_restantes = litros_restantes - @volumenLitros WHERE id_canilla = @idCanilla AND estado = 'Conectado'");
+                        // Actualizar litros restantes usando volumenFinal
+                        await request.query("UPDATE Barril SET litros_restantes = litros_restantes - @volumenFinal WHERE id_canilla = @idCanilla AND estado = 'Conectado'");
                         
                         // Actualizar estado a agotado si aplica
                         await request.query("UPDATE Barril SET estado = 'Agotado' WHERE id_canilla = @idCanilla AND estado = 'Conectado' AND litros_restantes <= 0");
@@ -63,6 +73,7 @@ const iniciarConsumidor = async () => {
                         await redisClient.del('stock:muro:resumen');
 
                         channel.ack(msg);
+                        
                     } catch (innerError) {
                         await transaction.rollback();
                         throw innerError;
