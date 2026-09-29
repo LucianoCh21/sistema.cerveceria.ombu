@@ -4,9 +4,32 @@ const { getConnection, sql } = require('../config/db');
 const getCanillas = async (req, res) => {
     try {
         const pool = await getConnection();
-        const result = await pool.request().query('SELECT * FROM Canilla');
+        const result = await pool.request().query(`
+            SELECT 
+                c.id_canilla, 
+                c.numero, 
+                c.estado, 
+                c.fecha_alta,
+                b.id_barril,
+                b.litros_restantes,
+                b.litros_totales,
+                b.estado AS estado_barril,
+                ce.id_cerveza,
+                ce.nombre AS estilo,
+                ce.nombre AS estilo_cerveza,
+                ce.nombre AS nombre_cerveza,
+                ec.nombre AS variedad,
+                ce.ibu,
+                ce.abv
+            FROM Canilla c
+            LEFT JOIN Barril b ON c.id_canilla = b.id_canilla AND b.estado = 'Conectado'
+            LEFT JOIN Cerveza ce ON b.id_cerveza = ce.id_cerveza
+            LEFT JOIN EstiloCerveza ec ON ce.id_estilo = ec.id_estilo
+            ORDER BY c.numero ASC
+        `);
         res.status(200).json(result.recordset);
     } catch (error) {
+        console.error("Error al obtener canillas:", error);
         res.status(500).json({ error: "Error interno del servidor" });
     }
 };

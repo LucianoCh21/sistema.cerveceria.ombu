@@ -1,11 +1,16 @@
 const sql = require('mssql');
-require('dotenv').config(); // Eliminamos la lectura del archivo fantasma
+const path = require('path');
+
+// Cargar .env tanto si se ejecuta desde raíz como desde /server
+require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
+require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
+require('dotenv').config();
 
 const dbConfig = {
     user: process.env.DB_USER || 'sa',
     password: process.env.DB_PASSWORD,
     server: process.env.DB_SERVER || 'localhost',
-    database: 'master', // CAMBIO CRUCIAL: Entramos a master para poder crear OmbuDB
+    database: process.env.DB_DATABASE || 'OmbuDB',
     port: parseInt(process.env.DB_PORT, 10) || 1434,
     options: { encrypt: true, trustServerCertificate: true }
 };
@@ -19,4 +24,4 @@ const getConnection = async () => {
     }
 };
 
-module.exports = { sql, getConnection };
+module.exports = { sql, getConnection, dbConfig };
