@@ -191,7 +191,7 @@
                                                 id="input-nfc-custom" 
                                                 class="form-input" 
                                                 placeholder="UID Físico (ej: A1B2C3D4E5)" 
-                                                value="A1B2C3D4E5"
+                                                value=""
                                                 style="text-align: center; font-family: monospace; font-weight: 700; letter-spacing: 0.1em;"
                                             >
                                         </div>
@@ -200,7 +200,7 @@
 
                                 <!-- Tarjetas de Prueba Rápida -->
                                 <div class="canilla-select-group">
-                                    <label style="font-size: 0.78rem;">Tarjetas de prueba (Click para seleccionar):</label>
+                                    <label style="font-size: 0.78rem;">Tarjetas registradas en base de datos (Click para seleccionar):</label>
                                     <div id="preset-cards-list" class="preset-cards-list"></div>
                                 </div>
 
@@ -234,13 +234,13 @@
                                 <div id="session-active-content" class="session-active-content" style="display: none;">
                                     <div class="session-user-badge">
                                         <div>
-                                            <div id="lbl-titular" class="user-titular">Juan Pérez</div>
-                                            <div id="lbl-uid" class="user-uid">NFC: A1B2C3D4E5</div>
-                                            <div id="lbl-canilla-activa" style="font-size: 0.8rem; color: var(--primary); margin-top: 0.2rem;">Canilla #1 — Caravana IPA</div>
+                                            <div id="lbl-titular" class="user-titular">-</div>
+                                            <div id="lbl-uid" class="user-uid">NFC: -</div>
+                                            <div id="lbl-canilla-activa" style="font-size: 0.8rem; color: var(--primary); margin-top: 0.2rem;">-</div>
                                         </div>
                                         <div class="session-user-saldo">
                                             <div class="saldo-label">Saldo Disponible</div>
-                                            <div id="lbl-saldo" class="saldo-monto">$6.500,00</div>
+                                            <div id="lbl-saldo" class="saldo-monto">$0,00</div>
                                         </div>
                                     </div>
 
@@ -276,13 +276,20 @@
                     </div>
                 </div>
 
-                <!-- VISTA 3: DASHBOARD DE STOCK -->
+                <!-- VISTA 3: DASHBOARD DE STOCK (LUCIANO CHESANI) -->
                 <div id="vista-stock" class="vista-seccion oculta">
-                    <section class="section-canillas">
+                    <section class="section-canillas" aria-labelledby="titulo-stock">
                         <div class="section-header">
-                            <h2>Dashboard de Barriles y Stock</h2>
+                            <h2 id="titulo-stock">Dashboard de Barriles y Stock</h2>
+                            <span id="contador-stock" class="counter">Consultando servidor...</span>
                         </div>
-                        <div id="dashboard-stock-grid" class="muro-canillas"></div>
+                        <div id="dashboard-stock-grid" class="muro-canillas" aria-live="polite">
+                            <div class="muro-loader" role="status">
+                                <div class="spinner-cervecero" aria-hidden="true"></div>
+                                <p class="loader-texto">Consultando inventario de barriles...</p>
+                                <span class="loader-subtexto">Sincronizando niveles de stock en tiempo real</span>
+                            </div>
+                        </div>
                     </section>
                 </div>
 
@@ -582,10 +589,16 @@
                 vistaNfc.classList.remove('oculta');
                 navNfc?.classList.add('active');
                 if (breadcrumbActive) breadcrumbActive.textContent = 'Terminal Autoservicio NFC';
+                if (window.terminalNfc && typeof window.terminalNfc.cargarDatosDesdeServidor === 'function') {
+                    window.terminalNfc.cargarDatosDesdeServidor();
+                }
             } else if (vista === 'stock') {
                 if(vistaStock) vistaStock.classList.remove('oculta');
                 navStock?.classList.add('active');
                 if (breadcrumbActive) breadcrumbActive.textContent = 'Barriles y Stock';
+                if (window.dashboardStock && typeof window.dashboardStock.cargarStock === 'function') {
+                    window.dashboardStock.cargarStock();
+                }
             } else {
                 vistaMuro.classList.remove('oculta');
                 navMuro?.classList.add('active');

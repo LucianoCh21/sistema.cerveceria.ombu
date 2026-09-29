@@ -141,7 +141,124 @@ const consultarSesion = async (req, res) => {
     }
 };
 
+/**
+ * Obtiene todas las tarjetas NFC registradas en OmbuDB con saldo y titular real.
+ */
+const getTarjetas = async (req, res) => {
+    try {
+        const pool = await getConnection();
+        const result = await pool.request().query(`
+            SELECT 
+                t.id_tarjeta AS uid,
+                t.id_tarjeta,
+                t.saldo_actual AS saldo,
+                t.estado,
+                t.id_cliente,
+                c.nombre,
+                c.apellido,
+                CASE 
+                    WHEN t.id_cliente IS NULL THEN 'Consumidor Final (Anónima)'
+                    ELSE CONCAT(c.nombre, ' ', c.apellido)
+                END AS titular,
+                CASE 
+                    WHEN t.id_cliente IS NULL THEN 'Anónima'
+                    ELSE 'Nominada'
+                END AS tipo
+            FROM TarjetaNFC t
+            LEFT JOIN Cliente c ON t.id_cliente = c.id_cliente
+            ORDER BY t.id_cliente DESC, t.id_tarjeta ASC
+        `);
+
+        return res.status(200).json({
+            ok: true,
+            data: result.recordset
+        });
+    } catch (error) {
+        console.error("[NFC Controller] Error en getTarjetas:", error);
+        return res.status(500).json({
+            ok: false,
+            error: "Error interno al consultar tarjetas en base de datos."
+        });
+    }
+};
+
+/**
+ * Obtiene formatos de servicio y precios vigentes según la canilla/cerveza seleccionada.
+ */
+const getFormatosYPrecios = async (req, res) => {
+    const idCanilla = req.query.id_canilla ? Number(req.query.id_canilla) : null;
+
+    try {
+        const pool = await getConnection();
+        let idCerveza = null;
+        let nombreCerveza = null;
+
+        if (idCanilla) {
+            const canillaResult = await pool.request()
+                .input('id_canilla', sql.Int, idCanilla)
+                .query(`
+                    SELECT b.id_cerveza, ce.nombre as nombre_cerveza
+                    FROM Canilla c
+                    LEFT JOIN Barril b ON c.id_canilla = b.id_canilla AND b.estado = 'Conectado'
+                    LEFT JOIN Cerveza ce ON b.id_cerveza = ce.id_cerveza
+                    WHERE c.id_canilla = @id_canilla
+                `);
+            if (canillaResult.recordset.length > 0) {
+                idCerveza = canillaResult.recordset[0].id_cerveza;
+                nombreCerveza = canillaResult.recordset[0].nombre_cerveza;
+            }
+        }
+
+        const reqPrecios = pool.request();
+        let queryPrecios = `
+            SELECT 
+                fs.id_formato AS id,
+                fs.nombre,
+                fs.mililitros AS ml,
+                ISNULL(pc.precio, CASE 
+                    WHEN fs.mililitros = 250 THEN 1950.00
+                    WHEN fs.mililitros = 500 THEN 3500.00
+                    WHEN fs.mililitros = 1000 THEN 6500.00
+                    ELSE 3000.00
+                END) AS precio,
+                CASE 
+                    WHEN fs.mililitros <= 300 THEN '🍺'
+                    WHEN fs.mililitros <= 600 THEN '🍻'
+                    ELSE '🛢️'
+                END AS icon
+            FROM FormatoServicio fs
+            LEFT JOIN PrecioCerveza pc ON fs.id_formato = pc.id_formato 
+                AND pc.vigente_hasta IS NULL
+        `;
+
+        if (idCerveza) {
+            reqPrecios.input('id_cerveza', sql.Int, idCerveza);
+            queryPrecios += ` AND pc.id_cerveza = @id_cerveza`;
+        }
+
+        queryPrecios += ` ORDER BY fs.mililitros ASC`;
+
+        const result = await reqPrecios.query(queryPrecios);
+
+        return res.status(200).json({
+            ok: true,
+            id_canilla: idCanilla,
+            id_cerveza: idCerveza,
+            cerveza: nombreCerveza || 'Cerveza Ombú',
+            formatos: result.recordset
+        });
+    } catch (error) {
+        console.error("[NFC Controller] Error en getFormatosYPrecios:", error);
+        return res.status(500).json({
+            ok: false,
+            error: "Error interno al consultar formatos y precios."
+        });
+    }
+};
+
 module.exports = {
     autenticarTarjeta,
-    consultarSesion
+    consultarSesion,
+    getTarjetas,
+    getFormatosYPrecios
 };

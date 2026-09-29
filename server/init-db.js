@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 const fs = require('fs');
 const path = require('path');
-const { getConnection } = require('./config/db');
+const { getConnection, dbConfig, sql } = require('./config/db');
 
 async function initDatabase() {
     console.log('========================================================');
@@ -26,6 +26,19 @@ async function initDatabase() {
     console.log(`📄 Script detectado: ${sqlScriptPath}`);
 
     try {
+        // Conexión previa a 'master' para crear OmbuDB en instalaciones limpias
+        const masterConfig = { ...dbConfig, database: 'master' };
+        console.log(`🔌 Conectando a SQL Server (${masterConfig.server}:${masterConfig.port}) para verificar base OmbuDB...`);
+        const masterPool = await sql.connect(masterConfig);
+        await masterPool.request().query(`
+            IF NOT EXISTS (SELECT name FROM sys.databases WHERE name = N'OmbuDB')
+            BEGIN
+                CREATE DATABASE [OmbuDB];
+            END
+        `);
+        await masterPool.close();
+        console.log('✅ Base de datos OmbuDB asegurada en el servidor.');
+
         const pool = await getConnection();
         console.log('✅ Conexión establecida con SQL Server (OmbuDB).');
 
