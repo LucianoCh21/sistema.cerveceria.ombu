@@ -475,12 +475,32 @@ function mostrarModalTicket(despacho) {
     const modal = document.getElementById('ticket-modal');
     if (!modal) return;
 
-    document.getElementById('modal-id-despacho').textContent = `#${despacho.id_despacho}`;
-    document.getElementById('modal-cerveza').textContent = despacho.cerveza || 'Cerveza Ombú';
-    document.getElementById('modal-formato').textContent = `${despacho.formato} (${despacho.mililitros_servidos || (despacho.volumen_litros * 1000)} ml)`;
-    document.getElementById('modal-importe').textContent = `$${Number(despacho.importe_cobrado || despacho.precio_cobrado).toLocaleString('es-AR', { minimumFractionDigits: 2 })}`;
-    document.getElementById('modal-saldo-restante').textContent = `$${Number(despacho.saldo_restante).toLocaleString('es-AR', { minimumFractionDigits: 2 })}`;
-    document.getElementById('modal-cliente').textContent = despacho.cliente || despacho.cliente_nombre || 'Consumidor Final';
+    // Obtener importe con fallbacks seguros para evitar NaN
+    const rawImporte = despacho.importe_cobrado ?? 
+                       despacho.precio_cobrado ?? 
+                       despacho.importe_debitado ?? 
+                       despacho.importe ?? 
+                       terminalState.formatoSeleccionado?.precio ?? 
+                       0;
+    const importeMonto = Number(rawImporte) || 0;
+
+    const rawSaldo = despacho.saldo_restante ?? 
+                     terminalState.sesionActiva?.saldo_disponible ?? 
+                     0;
+    const saldoMonto = Number(rawSaldo) || 0;
+
+    const canillaObj = terminalState.canillas?.find(c => (c.id_canilla || c.numero) === terminalState.canillaSeleccionada);
+    const nombreCerveza = despacho.cerveza || canillaObj?.nombre_cerveza || canillaObj?.estilo || 'Cerveza Ombú';
+    const nombreFormato = despacho.formato || terminalState.formatoSeleccionado?.nombre || 'Pinta';
+    const mlServidos = despacho.mililitros_servidos || (despacho.volumen_litros ? despacho.volumen_litros * 1000 : null) || terminalState.formatoSeleccionado?.ml || 500;
+    const nombreCliente = despacho.cliente || despacho.cliente_nombre || terminalState.sesionActiva?.cliente_nombre || 'Consumidor Final';
+
+    document.getElementById('modal-id-despacho').textContent = `#${despacho.id_despacho || '-'}`;
+    document.getElementById('modal-cerveza').textContent = nombreCerveza;
+    document.getElementById('modal-formato').textContent = `${nombreFormato} (${mlServidos} ml)`;
+    document.getElementById('modal-importe').textContent = `$${importeMonto.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`;
+    document.getElementById('modal-saldo-restante').textContent = `$${saldoMonto.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`;
+    document.getElementById('modal-cliente').textContent = nombreCliente;
 
     modal.style.display = 'flex';
 }
