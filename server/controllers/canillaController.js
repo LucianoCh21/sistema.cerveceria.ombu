@@ -4,9 +4,32 @@ const { getConnection, sql } = require('../config/db');
 const getCanillas = async (req, res) => {
     try {
         const pool = await getConnection();
-        const result = await pool.request().query('SELECT * FROM Canilla');
+        const result = await pool.request().query(`
+            SELECT 
+                c.id_canilla, 
+                c.numero, 
+                c.estado, 
+                c.fecha_alta,
+                b.id_barril,
+                b.litros_restantes,
+                b.litros_totales,
+                b.estado AS estado_barril,
+                ce.id_cerveza,
+                ce.nombre AS estilo,
+                ce.nombre AS estilo_cerveza,
+                ce.nombre AS nombre_cerveza,
+                ec.nombre AS variedad,
+                ce.ibu,
+                ce.abv
+            FROM Canilla c
+            LEFT JOIN Barril b ON c.id_canilla = b.id_canilla AND b.estado = 'Conectado'
+            LEFT JOIN Cerveza ce ON b.id_cerveza = ce.id_cerveza
+            LEFT JOIN EstiloCerveza ec ON ce.id_estilo = ec.id_estilo
+            ORDER BY c.numero ASC
+        `);
         res.status(200).json(result.recordset);
     } catch (error) {
+        console.error("Error al obtener canillas:", error);
         res.status(500).json({ error: "Error interno del servidor" });
     }
 };
@@ -73,23 +96,24 @@ const updateCanilla = async (req, res, next) => {
     }
 };
 
-// 5. DELETE (REMOVE)
+// 5. DELETE (SOFT DELETE)
 const deleteCanilla = async (req, res, next) => {
     const { id } = req.params;
 
     try {
         const pool = await getConnection();
+        // Borrado lógico para preservar integridad referencial con el histórico de Despacho y Barril
         const result = await pool.request()
             .input('id', sql.Int, id)
-            .query('DELETE FROM Canilla WHERE id_canilla = @id');
+            .query("UPDATE Canilla SET estado = 'Inactiva' WHERE id_canilla = @id");
 
         if (result.rowsAffected[0] === 0) {
-            return res.status(404).json({ error: "Canilla no encontrada para eliminar" });
+            return res.status(404).json({ error: "Canilla no encontrada para desactivar" });
         }
 
-        res.status(204).send();
+        res.status(200).json({ message: "Canilla desactivada exitosamente (borrado lógico)" });
     } catch (error) {
-        console.error("Error SQL Server en DELETE:", error); 
+        console.error("Error SQL Server en DELETE (soft-delete):", error); 
         res.status(500).json({ error: "Error interno del servidor" });
     }
 };
