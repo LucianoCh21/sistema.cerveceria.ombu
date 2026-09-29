@@ -1,33 +1,51 @@
-# Ombú Cervecería de Especialidad - Self-Service Tap Wall NFC
+# Cervecería Ombú - Módulo: Barriles y Control de Stock (AE2)
+**Autor:** Luciano Rubén Chesani
+**Rama:** `ae2/barriles-stock`
 
-Sistema backend para la gestión de un muro de canillas de autoservicio, desarrollado para la materia Paradigmas y Lenguajes de Programación III (UCP - FAITA).
+Este módulo gestiona el inventario de barriles en frío, la asignación a las canillas del Tap Wall, y el descuento de litros de forma reactiva mediante mensajería asíncrona.
 
-**Actividad de Evaluación N° 1 (AE1)**: Diseño y codificación incremental de una API RESTful.
+## Arquitectura Implementada
+- **Backend:** Node.js / Express
+- **Base de Datos:** SQL Server 2022 (Docker) - Concurrencia controlada con aislamiento `SERIALIZABLE` y bloqueos `UPDLOCK` (RN-03).
+- **Caché Efímera:** Redis (Docker) - Patrón de degradación controlada implementado para el resumen del Dashboard.
+- **Mensajería Asíncrona:** RabbitMQ (Docker) - Consumidor backend para descuento de stock con validación de idempotencia (RNF-08).
+- **Frontend:** Vanilla JS inyectado dinámicamente con interacción mediante modales personalizados HTML/CSS.
 
-**Autores**
-* Lucrecia Sabrina Mencia
-* Luciano Rubén Chesani
+## Pasos para Ejecutar el Entorno
 
-**Arquitectura y Stack Tecnológico**
-El proyecto implementa una arquitectura en capas (N-Layers) para separar responsabilidades, operando de forma asíncrona y nativa sin ORMs.
-* **Entorno**: Node.js puro sobre Linux.
-* **Enrutamiento**: Express.js.
-* **Base de Datos**: Microsoft SQL Server (vía driver nativo `mssql`).
-* **Estructura**:
-  * `/config`: Conexión directa, exclusión mutua y credenciales de base de datos.
-  * `/routes`: Definición de endpoints HTTP.
-  * `/controllers`: Lógica de negocio, validaciones y manejo centralizado de códigos HTTP (200, 201, 400, 404, 500).
+### 1. Levantar la Infraestructura
+Asegúrese de tener Docker Desktop iniciado. En la raíz del proyecto, levante los contenedores:
+\`\`\`bash
+docker compose up -d
+\`\`\`
+*Nota: Esto levantará SQL Server (puerto 1434), Redis y RabbitMQ. Aguarde 15 segundos para que la base de datos inicie por completo.*
 
-**Entidad Principal (AE1): Canilla**
-El sistema expone un CRUD funcional para gestionar los grifos físicos del muro:
-* `GET /api/v1/canillas`: Retorna el listado completo de canillas.
-* `GET /api/v1/canillas/{id}`: Retorna el detalle de una canilla específica.
-* `POST /api/v1/canillas`: Da de alta una nueva canilla (requiere validación de payload JSON).
-* `PUT /api/v1/canillas/{id}`: Modifica el estado operativo o configuración.
-* `DELETE /api/v1/canillas/{id}`: Elimina el recurso del sistema.
+### 2. Configurar Variables de Entorno
+Dentro de la carpeta `server/`, cree un archivo `.env` configurando las credenciales de conexión:
+\`\`\`env
+DB_USER="sa"
+DB_PASSWORD="TuPassword123!"
+DB_SERVER="localhost"
+DB_DATABASE="OmbuDB"
+DB_PORT=1434
+\`\`\`
 
-**Ejecución del Proyecto**
-1. Clonar el repositorio.
-2. Ejecutar `npm install` para instalar Express y el driver SQL.
-3. Asegurar que el contenedor de SQL Server esté activo en el puerto 1433 local.
-4. Levantar el servidor de desarrollo con `node index.js`.
+### 3. Instalar Dependencias e Inicializar Base de Datos
+Desde la terminal, ingrese a la carpeta del servidor e instale los paquetes:
+\`\`\`bash
+cd server
+npm install
+npm run init-db
+\`\`\`
+*Este comando creará la base de datos `OmbuDB`, ejecutará el script DDL/DML y poblará las tablas de barriles, canillas y precios.*
+
+### 4. Iniciar el Servidor API y el Consumidor
+En la misma carpeta `server/`, encienda la aplicación:
+\`\`\`bash
+node index.js
+\`\`\`
+*Verá en consola que el servidor Express está activo y que el Worker de RabbitMQ se encuentra escuchando eventos.*
+
+### 5. Ejecutar el Frontend
+Abra el archivo `client/index.html` utilizando la extensión **Live Server** en Visual Studio Code.
+Navegue a la sección **"Barriles y Stock"** en el menú lateral para ver el dashboard en tiempo real, visualizar la velocidad de la caché y probar la reasignación de barriles mediante el modal interactivo.

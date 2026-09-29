@@ -3,39 +3,24 @@ version: '3.8'
 services:
   sqlserver:
     image: mcr.microsoft.com/mssql/server:2022-latest
-<<<<<<< HEAD
-    container_name: ombu_sqlserver
-    environment:
-      - ACCEPT_EULA=Y
-      - MSSQL_SA_PASSWORD=${DB_PASSWORD:-TuPassword123!}
-    ports:
-      - "1433:1433"
-    volumes:
-      - sqlserver_data:/var/opt/mssql
-=======
     container_name: sqlserver
     restart: always
     environment:
       - ACCEPT_EULA=Y
-      - MSSQL_SA_PASSWORD=${DB_PASSWORD}
+      - MSSQL_SA_PASSWORD=TuPassword123!
       - MSSQL_PID=Developer
     ports:
-      - "1433:1433"
+      - "1434:1433"
     volumes:
       - mssql_data:/var/opt/mssql
->>>>>>> 65ba5cc1514f4b154c57ddbadc351df1a7f046f6
     networks:
       - ombu-network
 
   redis:
     image: redis:7-alpine
-<<<<<<< HEAD
-    container_name: ombu_redis
-=======
     container_name: ombu-redis
     restart: always
     command: ["redis-server", "--appendonly", "yes"]
->>>>>>> 65ba5cc1514f4b154c57ddbadc351df1a7f046f6
     ports:
       - "6379:6379"
     volumes:
@@ -45,15 +30,6 @@ services:
 
   rabbitmq:
     image: rabbitmq:3-management-alpine
-<<<<<<< HEAD
-    container_name: ombu_rabbitmq
-    environment:
-      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER:-guest}
-      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASS:-guest}
-    ports:
-      - "5672:5672"
-      - "15672:15672"
-=======
     container_name: ombu-rabbitmq
     restart: always
     environment:
@@ -62,18 +38,13 @@ services:
     ports:
       - "5672:5672"     # Puerto estándar AMQP 0-9-1
       - "15672:15672"   # Panel Web de Gestión (RabbitMQ Management Dashboard)
->>>>>>> 65ba5cc1514f4b154c57ddbadc351df1a7f046f6
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     networks:
       - ombu-network
 
 volumes:
-<<<<<<< HEAD
-  sqlserver_data:
-=======
   mssql_data:
->>>>>>> 65ba5cc1514f4b154c57ddbadc351df1a7f046f6
   redis_data:
   rabbitmq_data:
 
