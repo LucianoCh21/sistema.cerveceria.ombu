@@ -276,6 +276,16 @@
                     </div>
                 </div>
 
+                <!-- VISTA 3: DASHBOARD DE STOCK -->
+                <div id="vista-stock" class="vista-seccion oculta">
+                    <section class="section-canillas">
+                        <div class="section-header">
+                            <h2>Dashboard de Barriles y Stock</h2>
+                        </div>
+                        <div id="dashboard-stock-grid" class="muro-canillas"></div>
+                    </section>
+                </div>
+
                 <!-- Modal de Ticket / Comprobante PDF (Día 5) -->
                 <div id="ticket-modal" class="ticket-modal-overlay" style="display: none;">
                     <div class="ticket-modal-card">
@@ -550,22 +560,34 @@
         const navMuro = document.getElementById('nav-link-muro');
         const navAlta = document.getElementById('nav-link-alta');
         const navNfc = document.getElementById('nav-link-nfc');
+        const navStock = document.getElementById('nav-link-stock');
         const vistaMuro = document.getElementById('vista-muro-gestion');
         const vistaNfc = document.getElementById('vista-terminal-nfc');
+        const vistaStock = document.getElementById('vista-stock');
         const breadcrumbActive = document.getElementById('breadcrumb-active');
 
         function activarVista(vista) {
+            // Ocultar todas
+            vistaMuro.classList.add('oculta');
+            vistaNfc.classList.add('oculta');
+            if(vistaStock) vistaStock.classList.add('oculta');
+            
+            // Limpiar active de navs
+            navMuro?.classList.remove('active');
+            navAlta?.classList.remove('active');
+            navNfc?.classList.remove('active');
+            navStock?.classList.remove('active');
+
             if (vista === 'nfc') {
-                vistaMuro.classList.add('oculta');
                 vistaNfc.classList.remove('oculta');
-                navMuro?.classList.remove('active');
-                navAlta?.classList.remove('active');
                 navNfc?.classList.add('active');
                 if (breadcrumbActive) breadcrumbActive.textContent = 'Terminal Autoservicio NFC';
+            } else if (vista === 'stock') {
+                if(vistaStock) vistaStock.classList.remove('oculta');
+                navStock?.classList.add('active');
+                if (breadcrumbActive) breadcrumbActive.textContent = 'Barriles y Stock';
             } else {
-                vistaNfc.classList.add('oculta');
                 vistaMuro.classList.remove('oculta');
-                navNfc?.classList.remove('active');
                 navMuro?.classList.add('active');
                 if (breadcrumbActive) breadcrumbActive.textContent = 'Gestión de Canillas';
             }
@@ -574,6 +596,7 @@
         navMuro?.addEventListener('click', (e) => { e.preventDefault(); activarVista('muro'); });
         navAlta?.addEventListener('click', () => { activarVista('muro'); });
         navNfc?.addEventListener('click', (e) => { e.preventDefault(); activarVista('nfc'); });
+        navStock?.addEventListener('click', (e) => { e.preventDefault(); activarVista('stock'); });
 
         // Carga inicial de canillas
         document.addEventListener('DOMContentLoaded', cargarCanillas);
@@ -583,5 +606,7 @@
     <script src="src/comprobantePdf.js"></script>
     <!-- Módulo de Terminal de Autoservicio Tap Wall NFC (Días 3 y 5) -->
     <script src="src/terminalNfc.js"></script>
+    <!-- Módulo Visual del Dashboard de Stock -->
+    <script src="src/pages/dashboardStock.js" type="module"></script>
 </body>
 </html>

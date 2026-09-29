@@ -5,6 +5,9 @@ const cors = require('cors');
 const canillaRoutes = require('./routes/canillaRoutes');
 const nfcRoutes = require('./routes/nfcRoutes');
 const despachoRoutes = require('./routes/despachoRoutes');
+const barrilRoutes = require('./routes/barrilRoutes');
+const stockRoutes = require('./routes/stockRoutes');
+const { iniciarConsumidor } = require('./workers/stockConsumer');
 
 const app = express();
 
@@ -30,6 +33,10 @@ app.use('/api/v1/canillas', canillaRoutes);
 app.use('/api/nfc', nfcRoutes);
 app.use('/api/despachos', despachoRoutes);
 
+// Módulo AE2: Barriles y Control de Stock (Luciano Chesani)
+app.use('/api/barriles', barrilRoutes);
+app.use('/api/stock', stockRoutes);
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`====================================================`);
@@ -37,5 +44,8 @@ app.listen(PORT, () => {
     console.log(`📡 Endpoints NFC:       POST /api/nfc/autenticar`);
     console.log(`🍻 Endpoints Despachos: POST /api/despachos`);
     console.log(`📄 Comprobante PDF:     GET  /api/despachos/:id/comprobante`);
+    console.log(`📦 Endpoints Barriles:  GET/POST/DELETE /api/barriles`);
     console.log(`====================================================`);
 });
+
+iniciarConsumidor().then(() => console.log('Consumidor RabbitMQ iniciado')).catch(console.error);
