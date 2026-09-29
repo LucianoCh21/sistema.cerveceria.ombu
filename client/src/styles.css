@@ -685,3 +685,697 @@ body {
         padding: 1.25rem;
     }
 }
+
+/* ==========================================================================
+   DÍA 3 & 5 - Estilos de la Terminal de Autoservicio Tap Wall NFC & Timer TTL
+   ========================================================================== */
+
+/* Navegación y Vistas */
+.vista-seccion {
+    display: block;
+}
+
+.vista-seccion.oculta {
+    display: none !important;
+}
+
+/* Panel Principal de la Terminal NFC */
+.terminal-nfc-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.terminal-header {
+    background: linear-gradient(135deg, var(--bg-surface), #1a1e2b);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: var(--shadow-card);
+}
+
+.terminal-header-info h2 {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--primary-light);
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+}
+
+.terminal-header-info p {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    margin-top: 0.25rem;
+}
+
+.terminal-badge-ttl {
+    background: rgba(245, 158, 11, 0.15);
+    border: 1px solid var(--border-focus);
+    color: var(--primary);
+    padding: 0.5rem 1rem;
+    border-radius: var(--radius-md);
+    font-size: 0.85rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* Grid de la Terminal */
+.terminal-grid {
+    display: grid;
+    grid-template-columns: 1fr 1.2fr;
+    gap: 1.5rem;
+}
+
+@media (max-width: 1024px) {
+    .terminal-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Tarjeta del Simulador NFC */
+.nfc-simulator-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    box-shadow: var(--shadow-card);
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.nfc-simulator-card h3 {
+    font-size: 1.15rem;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+/* Selector de Canilla */
+.canilla-select-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.canilla-select-group label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.canilla-selector-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 0.6rem;
+}
+
+.canilla-btn-chip {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 0.6rem 0.75rem;
+    color: var(--text-primary);
+    font-size: 0.82rem;
+    cursor: pointer;
+    text-align: left;
+    transition: var(--transition);
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.canilla-btn-chip:hover {
+    border-color: var(--primary);
+    background: var(--bg-card-hover);
+}
+
+.canilla-btn-chip.selected {
+    border-color: var(--primary);
+    background: rgba(245, 158, 11, 0.12);
+    box-shadow: var(--shadow-glow);
+}
+
+.canilla-btn-chip .canilla-chip-num {
+    font-weight: 700;
+    color: var(--primary);
+}
+
+.canilla-btn-chip .canilla-chip-name {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Área de Simulación de Tap NFC */
+.nfc-tap-zone {
+    border: 2px dashed var(--border-light);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    text-align: center;
+    background: rgba(18, 20, 28, 0.6);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.85rem;
+    transition: var(--transition);
+}
+
+.nfc-tap-zone:hover {
+    border-color: var(--primary);
+    background: rgba(245, 158, 11, 0.03);
+}
+
+.nfc-tap-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #1e2230, #2c3144);
+    border: 2px solid var(--border-focus);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.75rem;
+    box-shadow: var(--shadow-glow);
+    animation: nfcPulse 2.5s infinite;
+}
+
+@keyframes nfcPulse {
+    0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); }
+    70% { box-shadow: 0 0 0 14px rgba(245, 158, 11, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+}
+
+/* Tarjetas Rápidas de Prueba */
+.preset-cards-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    width: 100%;
+}
+
+.preset-card-item {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 0.55rem 0.85rem;
+    font-size: 0.8rem;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: var(--transition);
+    color: var(--text-primary);
+}
+
+.preset-card-item:hover {
+    border-color: var(--primary-light);
+    background: var(--bg-card-hover);
+}
+
+.preset-card-item.selected {
+    border-color: var(--primary);
+    background: rgba(245, 158, 11, 0.15);
+}
+
+.preset-card-uid {
+    font-family: monospace;
+    font-weight: 700;
+    color: var(--primary);
+}
+
+.btn-tap-nfc {
+    width: 100%;
+    padding: 0.85rem;
+    background: linear-gradient(135deg, var(--primary), #d97706);
+    color: #000;
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: 0.95rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.btn-tap-nfc:hover {
+    background: linear-gradient(135deg, var(--primary-light), var(--primary));
+    box-shadow: 0 0 15px rgba(245, 158, 11, 0.4);
+    transform: translateY(-2px);
+}
+
+.btn-tap-nfc:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Panel de Sesión y Grifo Activo (Cuenta Regresiva TTL 45s) */
+.grifo-session-panel {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    box-shadow: var(--shadow-card);
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    min-height: 480px;
+    justify-content: center;
+}
+
+/* Estado de Espera / Inactivo */
+.session-standby {
+    text-align: center;
+    padding: 3rem 1.5rem;
+    color: var(--text-muted);
+}
+
+.session-standby-icon {
+    font-size: 3.5rem;
+    margin-bottom: 1rem;
+    opacity: 0.7;
+}
+
+.session-standby h3 {
+    color: var(--text-secondary);
+    font-size: 1.2rem;
+    margin-bottom: 0.5rem;
+}
+
+/* Sesión Activa con Cuenta Regresiva */
+.session-active-content {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.session-user-badge {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 1rem 1.25rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.session-user-badge .user-titular {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.session-user-badge .user-uid {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    font-family: monospace;
+}
+
+.session-user-badge .user-saldo {
+    text-align: right;
+}
+
+.session-user-badge .saldo-label {
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+}
+
+.session-user-badge .saldo-monto {
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: var(--color-success);
+}
+
+/* Temporizador Regresivo Circular / Barra */
+.countdown-box {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(18, 20, 28, 0.8));
+    border: 1px solid var(--border-focus);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    position: relative;
+    overflow: hidden;
+}
+
+.countdown-box.warning {
+    border-color: #f97316;
+    background: rgba(249, 115, 22, 0.08);
+}
+
+.countdown-box.danger {
+    border-color: var(--color-error);
+    background: rgba(239, 68, 68, 0.1);
+    animation: dangerPulse 1s infinite alternate;
+}
+
+@keyframes dangerPulse {
+    0% { box-shadow: 0 0 5px rgba(239, 68, 68, 0.2); }
+    100% { box-shadow: 0 0 20px rgba(239, 68, 68, 0.5); }
+}
+
+.countdown-number {
+    font-size: 3.5rem;
+    font-weight: 900;
+    color: var(--primary-light);
+    font-family: monospace;
+    line-height: 1;
+}
+
+.countdown-box.warning .countdown-number {
+    color: #fb923c;
+}
+
+.countdown-box.danger .countdown-number {
+    color: #f87171;
+}
+
+.countdown-label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.countdown-progress-bar {
+    width: 100%;
+    height: 8px;
+    background: var(--bg-card);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    margin-top: 0.25rem;
+}
+
+.countdown-progress-fill {
+    height: 100%;
+    width: 100%;
+    background: linear-gradient(90deg, var(--color-success), var(--primary));
+    transition: width 1s linear;
+}
+
+.countdown-box.warning .countdown-progress-fill {
+    background: #f97316;
+}
+
+.countdown-box.danger .countdown-progress-fill {
+    background: var(--color-error);
+}
+
+.tap-status-banner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1rem;
+    border-radius: var(--radius-md);
+    background: rgba(16, 185, 129, 0.15);
+    border: 1px solid var(--color-success-border);
+    color: var(--color-success);
+    font-weight: 600;
+    font-size: 0.85rem;
+}
+
+/* Formatos de Servido (Día 5) */
+.formatos-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.75rem;
+}
+
+.formato-btn {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 0.85rem 0.5rem;
+    text-align: center;
+    cursor: pointer;
+    transition: var(--transition);
+    color: var(--text-primary);
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.formato-btn:hover {
+    border-color: var(--primary);
+    background: var(--bg-card-hover);
+}
+
+.formato-btn.selected {
+    border-color: var(--primary);
+    background: rgba(245, 158, 11, 0.15);
+    box-shadow: var(--shadow-glow);
+}
+
+.formato-icon {
+    font-size: 1.5rem;
+}
+
+.formato-nombre {
+    font-weight: 700;
+    font-size: 0.85rem;
+}
+
+.formato-volumen {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.formato-precio {
+    font-weight: 800;
+    color: var(--primary);
+    font-size: 0.95rem;
+    margin-top: 0.2rem;
+}
+
+/* Botón de Servir */
+.btn-servir-cerveza {
+    width: 100%;
+    padding: 1rem;
+    background: linear-gradient(135deg, var(--color-success), #059669);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: 1.1rem;
+    font-weight: 800;
+    cursor: pointer;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+}
+
+.btn-servir-cerveza:hover {
+    background: linear-gradient(135deg, #34d399, var(--color-success));
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(16, 185, 129, 0.5);
+}
+
+.btn-servir-cerveza:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.btn-cancelar-sesion {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-muted);
+    padding: 0.5rem;
+    border-radius: var(--radius-md);
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.btn-cancelar-sesion:hover {
+    border-color: var(--color-error);
+    color: var(--color-error);
+}
+
+/* Animación de Servido de Cerveza */
+.pouring-animation-container {
+    text-align: center;
+    padding: 2rem 1rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+}
+
+.beer-glass-animation {
+    width: 70px;
+    height: 110px;
+    border: 4px solid var(--primary-light);
+    border-top: none;
+    border-radius: 0 0 14px 14px;
+    position: relative;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.beer-liquid {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 0%;
+    background: linear-gradient(180deg, #fef08a, #f59e0b, #d97706);
+    animation: fillBeer 2.5s ease-in-out forwards;
+}
+
+.beer-foam {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 12px;
+    background: #fff;
+    border-radius: 4px;
+    opacity: 0.9;
+}
+
+@keyframes fillBeer {
+    0% { height: 0%; }
+    100% { height: 85%; }
+}
+
+/* Modal / Tarjeta de Confirmación de Despacho & Ticket */
+.ticket-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+
+.ticket-modal-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    width: 90%;
+    max-width: 480px;
+    padding: 2rem;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8);
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    animation: scaleIn 0.25s ease-out;
+}
+
+@keyframes scaleIn {
+    from { opacity: 0; transform: scale(0.92); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+.ticket-header {
+    text-align: center;
+    padding-bottom: 1rem;
+    border-bottom: 1px dashed var(--border-color);
+}
+
+.ticket-header h3 {
+    color: var(--color-success);
+    font-size: 1.3rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.ticket-header p {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.ticket-body-table {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    font-size: 0.9rem;
+}
+
+.ticket-row {
+    display: flex;
+    justify-content: space-between;
+}
+
+.ticket-row span:first-child {
+    color: var(--text-secondary);
+}
+
+.ticket-row span:last-child {
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.ticket-actions {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+}
+
+.btn-descargar-pdf {
+    flex: 1.5;
+    background: linear-gradient(135deg, var(--primary), #b45309);
+    color: #000;
+    border: none;
+    border-radius: var(--radius-md);
+    padding: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    transition: var(--transition);
+}
+
+.btn-descargar-pdf:hover {
+    background: linear-gradient(135deg, var(--primary-light), var(--primary));
+    box-shadow: var(--shadow-glow);
+}
+
+.btn-cerrar-modal {
+    flex: 1;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    border-radius: var(--radius-md);
+    padding: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.btn-cerrar-modal:hover {
+    background: var(--bg-card-hover);
+}

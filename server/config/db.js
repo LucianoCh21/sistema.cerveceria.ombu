@@ -1,10 +1,14 @@
 const sql = require('mssql');
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
+require('dotenv').config();
 
 const dbConfig = {
-    user: 'sa',
-    password: 'TuPassword123!',
-    server: 'localhost',
-    database: 'OmbuDB',
+    user: process.env.DB_USER || 'sa',
+    password: process.env.DB_PASSWORD,
+    server: process.env.DB_SERVER || 'localhost',
+    database: process.env.DB_DATABASE || 'OmbuDB',
+    port: parseInt(process.env.DB_PORT, 10) || 1433,
     options: { encrypt: true, trustServerCertificate: true }
 };
 
