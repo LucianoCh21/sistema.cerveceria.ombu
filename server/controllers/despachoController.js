@@ -88,9 +88,10 @@ const crearDespacho = async (req, res) => {
             const resBarril = await reqBarril
                 .input('id_canilla', sql.Int, Number(id_canilla))
                 .query(`
-                    SELECT id_barril, id_cerveza, litros_restantes, estado
-                    FROM Barril
-                    WHERE id_canilla = @id_canilla AND estado = 'Conectado'
+                    SELECT b.id_barril, b.id_cerveza, b.litros_restantes, b.estado, ce.nombre AS nombre_cerveza
+                    FROM Barril b
+                    JOIN Cerveza ce ON b.id_cerveza = ce.id_cerveza
+                    WHERE b.id_canilla = @id_canilla AND b.estado = 'Conectado'
                 `);
 
             if (resBarril.recordset.length === 0) {
@@ -205,17 +206,25 @@ const crearDespacho = async (req, res) => {
 
             const eventoPublicado = await publishDespachoRealizado(eventoPayload);
 
-            // 10. Construir respuesta exitosa
+            // 10. Construir respuesta exitosa con todos los campos necesarios para la UI
+            const clienteNombre = sesion?.cliente_nombre || (tarjetaActualizada.id_cliente ? 'Cliente Ombú' : 'Consumidor Final');
+
             const responseData = {
                 ok: true,
                 id_despacho: despachoInsertado.id_despacho,
                 id_canilla: Number(id_canilla),
                 id_barril: barrilActivo.id_barril,
+                cerveza: barrilActivo.nombre_cerveza || 'Cerveza Ombú',
+                cliente: clienteNombre,
+                cliente_nombre: clienteNombre,
                 id_formato: idFormato,
                 formato: formatoNombre,
                 volumen_litros: volumenLitros,
                 mililitros_servidos: mlServidos,
+                importe: precioCobrado,
+                importe_cobrado: precioCobrado,
                 importe_debitado: precioCobrado,
+                precio_cobrado: precioCobrado,
                 saldo_restante: Number(tarjetaActualizada.saldo_actual),
                 comprobante_url: `/api/despachos/${despachoInsertado.id_despacho}/comprobante`,
                 evento_rabbit_publicado: eventoPublicado,
