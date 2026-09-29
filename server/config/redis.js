@@ -125,6 +125,8 @@ const getIdempotencyResult = async (idempotencyKey) => {
 
 module.exports = {
     getRedisClient,
+    get redisClient() { return getRedisClient(); },
+    get client() { return getRedisClient(); },
     setNfcSession,
     getNfcSession,
     deleteNfcSession,
