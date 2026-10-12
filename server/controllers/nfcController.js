@@ -86,8 +86,15 @@ const autenticarTarjeta = async (req, res) => {
             iniciado_en: new Date().toISOString()
         };
 
-        // Guardar sesión en Redis usando el ID de la tarjeta
-        await setNfcSession(idTarjeta, sessionPayload, ttlSegundos);
+        // Guardar sesión en Redis usando el ID de la tarjeta con verificación de persistencia (F-03)
+        const guardada = await setNfcSession(idTarjeta, sessionPayload, ttlSegundos);
+        if (!guardada) {
+            return res.status(503).json({
+                ok: false,
+                error: 'No pudimos habilitar el grifo en este momento. Intentá de nuevo en unos segundos.',
+                codigo: 'SESSION_UNAVAILABLE'
+            });
+        }
 
         return res.status(200).json({
             ok: true,
@@ -102,12 +109,13 @@ const autenticarTarjeta = async (req, res) => {
         });
 
     } catch (error) {
-        console.error("[NFC Controller] Error en autenticarTarjeta:", error);
+        const traceId = Date.now().toString(36);
+        console.error(`[${traceId}] [NFC Controller] Error en autenticarTarjeta:`, error);
         return res.status(500).json({
             ok: false,
             error: "Error interno al autenticar tarjeta en base de datos.",
-            detalles: error.message,
-            codigo: "INTERNAL_SERVER_ERROR"
+            codigo: "INTERNAL_SERVER_ERROR",
+            traceId
         });
     }
 };
@@ -137,7 +145,9 @@ const consultarSesion = async (req, res) => {
             sesion
         });
     } catch (error) {
-        return res.status(500).json({ ok: false, error: error.message });
+        const traceId = Date.now().toString(36);
+        console.error(`[${traceId}] [NFC Controller] Error en consultarSesion:`, error);
+        return res.status(500).json({ ok: false, error: "Error interno al consultar la sesión.", codigo: "INTERNAL_SERVER_ERROR", traceId });
     }
 };
 
@@ -174,10 +184,13 @@ const getTarjetas = async (req, res) => {
             data: result.recordset
         });
     } catch (error) {
-        console.error("[NFC Controller] Error en getTarjetas:", error);
+        const traceId = Date.now().toString(36);
+        console.error(`[${traceId}] [NFC Controller] Error en getTarjetas:`, error);
         return res.status(500).json({
             ok: false,
-            error: "Error interno al consultar tarjetas en base de datos."
+            error: "Error interno al consultar tarjetas en base de datos.",
+            codigo: "INTERNAL_SERVER_ERROR",
+            traceId
         });
     }
 };
@@ -215,25 +228,20 @@ const getFormatosYPrecios = async (req, res) => {
                 fs.id_formato AS id,
                 fs.nombre,
                 fs.mililitros AS ml,
-                ISNULL(pc.precio, CASE 
-                    WHEN fs.mililitros = 250 THEN 1950.00
-                    WHEN fs.mililitros = 500 THEN 3500.00
-                    WHEN fs.mililitros = 1000 THEN 6500.00
-                    ELSE 3000.00
-                END) AS precio,
+                pc.precio AS precio,
                 CASE 
                     WHEN fs.mililitros <= 300 THEN '🍺'
                     WHEN fs.mililitros <= 600 THEN '🍻'
                     ELSE '🛢️'
                 END AS icon
             FROM FormatoServicio fs
-            LEFT JOIN PrecioCerveza pc ON fs.id_formato = pc.id_formato 
+            JOIN PrecioCerveza pc ON fs.id_formato = pc.id_formato 
                 AND pc.vigente_hasta IS NULL
         `;
 
         if (idCerveza) {
             reqPrecios.input('id_cerveza', sql.Int, idCerveza);
-            queryPrecios += ` AND pc.id_cerveza = @id_cerveza`;
+            queryPrecios += ` WHERE pc.id_cerveza = @id_cerveza`;
         }
 
         queryPrecios += ` ORDER BY fs.mililitros ASC`;
@@ -248,10 +256,13 @@ const getFormatosYPrecios = async (req, res) => {
             formatos: result.recordset
         });
     } catch (error) {
-        console.error("[NFC Controller] Error en getFormatosYPrecios:", error);
+        const traceId = Date.now().toString(36);
+        console.error(`[${traceId}] [NFC Controller] Error en getFormatosYPrecios:`, error);
         return res.status(500).json({
             ok: false,
-            error: "Error interno al consultar formatos y precios."
+            error: "Error interno al consultar formatos y precios.",
+            codigo: "INTERNAL_SERVER_ERROR",
+            traceId
         });
     }
 };

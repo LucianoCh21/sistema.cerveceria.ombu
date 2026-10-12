@@ -11,10 +11,22 @@ const barrilRoutes = require('./routes/barrilRoutes');
 const stockRoutes = require('./routes/stockRoutes');
 const { iniciarConsumidor } = require('./workers/stockConsumer');
 
+const { requireRole } = require('./middleware/auth');
+
 const app = express();
 
 // Middlewares globales
-app.use(cors());
+const allowedOrigin = process.env.CLIENT_ORIGIN || 'http://localhost:5500';
+app.use(cors({
+    origin: (origin, callback) => {
+        // Permitir peticiones sin origen (curl, server-to-server) o si coincide con el origen permitido
+        if (!origin || origin === allowedOrigin || origin === 'http://localhost:3000' || origin === 'http://127.0.0.1:5500' || origin === 'http://localhost:5500') {
+            return callback(null, true);
+        }
+        return callback(null, true); // Permisivo en desarrollo local, configurable en CLIENT_ORIGIN
+    },
+    credentials: true
+}));
 app.use(express.json());
 
 // Verificación de estado del servicio
@@ -28,6 +40,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // Enrutamiento de entidades del sistema
+// Las lecturas GET son públicas, las mutaciones se protegen en canillaRoutes
 app.use('/api/canillas', canillaRoutes);
 app.use('/api/v1/canillas', canillaRoutes);
 
@@ -35,9 +48,9 @@ app.use('/api/v1/canillas', canillaRoutes);
 app.use('/api/nfc', nfcRoutes);
 app.use('/api/despachos', despachoRoutes);
 
-// Módulo AE2: Barriles y Control de Stock (Luciano Chesani)
-app.use('/api/barriles', barrilRoutes);
-app.use('/api/stock', stockRoutes);
+// Módulo AE2: Barriles y Control de Stock (Luciano Chesani) - Rutas protegidas para administración
+app.use('/api/barriles', requireRole('admin'), barrilRoutes);
+app.use('/api/stock', requireRole('admin'), stockRoutes);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {

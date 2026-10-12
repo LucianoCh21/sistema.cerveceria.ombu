@@ -6,6 +6,10 @@
  */
 
 const API_BASE = 'http://localhost:3000/api';
+const TERMINAL_TOKEN = 'terminal-secret-token-ombu';
+const AUTH_HEADERS = {
+    'Authorization': `Bearer ${TERMINAL_TOKEN}`
+};
 
 // Estado reactivo de la terminal
 const terminalState = {
@@ -46,7 +50,9 @@ async function cargarDatosDesdeServidor() {
         }
 
         // 2. Cargar tarjetas NFC reales desde OmbuDB
-        const resTarjetas = await fetch(`${API_BASE}/nfc/tarjetas`);
+        const resTarjetas = await fetch(`${API_BASE}/nfc/tarjetas`, {
+            headers: { ...AUTH_HEADERS }
+        });
         if (resTarjetas.ok) {
             const dataTarjetas = await resTarjetas.json();
             terminalState.tarjetas = dataTarjetas.data || [];
@@ -75,7 +81,9 @@ async function cargarDatosDesdeServidor() {
 async function cargarFormatosCanilla(idCanilla) {
     if (!idCanilla) return;
     try {
-        const res = await fetch(`${API_BASE}/nfc/formatos?id_canilla=${idCanilla}`);
+        const res = await fetch(`${API_BASE}/nfc/formatos?id_canilla=${idCanilla}`, {
+            headers: { ...AUTH_HEADERS }
+        });
         if (res.ok) {
             const data = await res.json();
             terminalState.formatos = data.formatos || [];
@@ -273,7 +281,10 @@ async function ejecutarTapNFC(idTarjeta, idCanilla) {
     try {
         const response = await fetch(`${API_BASE}/nfc/autenticar`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                ...AUTH_HEADERS
+            },
             body: JSON.stringify({
                 id_tarjeta: idTarjeta,
                 id_canilla: idCanilla
@@ -424,15 +435,13 @@ async function ejecutarDespacho() {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Idempotency-Key': idempotencyKey
+                'Idempotency-Key': idempotencyKey,
+                ...AUTH_HEADERS
             },
             body: JSON.stringify({
                 id_tarjeta: sesionActiva.id_tarjeta,
                 id_canilla: canillaSeleccionada,
-                id_formato: formatoSeleccionado.id,
-                formato: formatoSeleccionado.nombre,
-                mililitros: formatoSeleccionado.ml,
-                importe: precioMonto
+                id_formato: formatoSeleccionado.id
             })
         });
 
@@ -446,7 +455,9 @@ async function ejecutarDespacho() {
             mostrarModalTicket(data);
 
             // Refrescar tarjetas de la base de datos para actualizar saldo en pantalla
-            const resTarjetas = await fetch(`${API_BASE}/nfc/tarjetas`);
+            const resTarjetas = await fetch(`${API_BASE}/nfc/tarjetas`, {
+                headers: { ...AUTH_HEADERS }
+            });
             if (resTarjetas.ok) {
                 const dataTarjetas = await resTarjetas.json();
                 terminalState.tarjetas = dataTarjetas.data || [];

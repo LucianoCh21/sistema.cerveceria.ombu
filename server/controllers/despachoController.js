@@ -23,38 +23,22 @@ const crearDespacho = async (req, res) => {
         });
     }
 
-    if (!idTarjeta || id_canilla === undefined || importe === undefined) {
+    if (!idTarjeta || id_canilla === undefined) {
         return res.status(400).json({
             ok: false,
-            error: "Faltan datos obligatorios para registrar el despacho (id_tarjeta/uid_tarjeta, id_canilla, importe).",
+            error: "Faltan datos obligatorios para registrar el despacho (id_tarjeta/uid_tarjeta, id_canilla).",
             codigo: "MISSING_PARAMETERS"
         });
     }
 
-    // Resolver formato y volumen en mililitros
-    let idFormato = req.body.id_formato ? Number(req.body.id_formato) : null;
-    let formatoNombre = req.body.formato;
-    let mlServidos = req.body.mililitros_servidos || req.body.mililitros;
-
-    if (!idFormato) {
-        const fStr = String(formatoNombre || '').toLowerCase();
-        if (fStr.includes('media') || Number(mlServidos) === 250) {
-            idFormato = 1;
-            mlServidos = mlServidos || 250;
-            formatoNombre = 'Media Pinta';
-        } else if (fStr.includes('litro') || Number(mlServidos) === 1000) {
-            idFormato = 3;
-            mlServidos = mlServidos || 1000;
-            formatoNombre = 'Litro';
-        } else {
-            idFormato = 2;
-            mlServidos = mlServidos || 500;
-            formatoNombre = 'Pinta';
-        }
+    const idFormato = Number(req.body.id_formato);
+    if (!Number.isInteger(idFormato) || idFormato <= 0) {
+        return res.status(400).json({
+            ok: false,
+            error: "Seleccioná un formato de servicio válido.",
+            codigo: "INVALID_FORMAT"
+        });
     }
-    mlServidos = Number(mlServidos) || (idFormato === 1 ? 250 : idFormato === 3 ? 1000 : 500);
-    const volumenLitros = Number(mlServidos) / 1000.0;
-    const precioCobrado = Number(importe);
 
     try {
         // 1. Verificación de Idempotencia
@@ -67,13 +51,22 @@ const crearDespacho = async (req, res) => {
             });
         }
 
-        // 2. Validación de Sesión Efímera en Redis (Control de TTL 45 segundos)
+        // 2. Validación de Sesión Efímera en Redis (Control de TTL 45 segundos y Canilla)
         const sesion = await getNfcSession(idTarjeta);
         if (!sesion) {
             return res.status(403).json({
                 ok: false,
                 error: "La sesión del grifo ha expirado (TTL de 45 segundos agotado) o la tarjeta no fue aproximada al lector.",
                 codigo: "SESSION_EXPIRED"
+            });
+        }
+
+        // F-03: Validar que la canilla corresponda a la que habilitó la sesión
+        if (Number(sesion.id_canilla) !== Number(id_canilla)) {
+            return res.status(403).json({
+                ok: false,
+                error: "La tarjeta fue habilitada en otra canilla. Volvé a apoyarla en esta.",
+                codigo: "SESSION_TAP_MISMATCH"
             });
         }
 
@@ -104,6 +97,32 @@ const crearDespacho = async (req, res) => {
             }
 
             const barrilActivo = resBarril.recordset[0];
+
+            // F-02: Obtener precio oficial vigente y volumen en base de datos para este formato y cerveza
+            const resPrecio = await new sql.Request(transaction)
+                .input('id_cerveza', sql.Int, barrilActivo.id_cerveza)
+                .input('id_formato', sql.Int, idFormato)
+                .query(`
+                    SELECT fs.nombre, fs.mililitros, pc.precio
+                    FROM FormatoServicio fs
+                    JOIN PrecioCerveza pc ON pc.id_formato = fs.id_formato
+                    WHERE fs.id_formato = @id_formato
+                      AND pc.id_cerveza = @id_cerveza
+                      AND pc.vigente_hasta IS NULL
+                `);
+
+            if (resPrecio.recordset.length === 0) {
+                await transaction.rollback();
+                return res.status(409).json({
+                    ok: false,
+                    error: "Este formato no tiene precio vigente para la cerveza servida.",
+                    codigo: "PRICE_NOT_FOUND"
+                });
+            }
+
+            const { nombre: formatoNombre, mililitros: mlServidos, precio } = resPrecio.recordset[0];
+            const precioCobrado = Number(precio);
+            const volumenLitros = Number(mlServidos) / 1000.0;
 
             if (Number(barrilActivo.litros_restantes) < volumenLitros) {
                 await transaction.rollback();
@@ -242,12 +261,13 @@ const crearDespacho = async (req, res) => {
         }
 
     } catch (error) {
-        console.error("[Despacho Controller] Error en crearDespacho:", error);
+        const traceId = Date.now().toString(36);
+        console.error(`[${traceId}] [Despacho Controller] Error en crearDespacho:`, error);
         return res.status(500).json({
             ok: false,
-            error: "Error interno al procesar el despacho y débito.",
-            detalles: error.message,
-            codigo: "TRANSACTION_FAILED"
+            error: "No pudimos procesar el servido. Intentá de nuevo.",
+            codigo: "TRANSACTION_FAILED",
+            traceId
         });
     }
 };
