@@ -5,11 +5,42 @@
  * Conexión dinámica 100% a OmbuDB (Canillas, Tarjetas NFC, Formatos y Precios vigentes).
  */
 
-const API_BASE = 'http://localhost:3000/api';
-const TERMINAL_TOKEN = 'terminal-secret-token-ombu';
+const API_BASE = (window.OMBU_CONFIG && window.OMBU_CONFIG.API_BASE) || 'http://localhost:3000/api';
+const TERMINAL_TOKEN = (window.OMBU_CONFIG && window.OMBU_CONFIG.TERMINAL_TOKEN) || 'terminal-secret-token-ombu';
 const AUTH_HEADERS = {
     'Authorization': `Bearer ${TERMINAL_TOKEN}`
 };
+
+// F-11: Diccionario amigable para el cliente (sin jerga técnica ni códigos de servidor)
+const MENSAJES = {
+    CARD_NOT_FOUND:     'No reconocemos esta tarjeta. Acercate a la barra para registrarla.',
+    CARD_INACTIVE:      'Esta tarjeta está bloqueada. Consultá en la barra.',
+    INSUFFICIENT_FUNDS: 'No tenés saldo suficiente. Recargá tu tarjeta en la barra.',
+    SESSION_EXPIRED:    'Se terminó el tiempo para servirte. Volvé a apoyar la tarjeta.',
+    SESSION_TAP_MISMATCH: 'La tarjeta fue habilitada en otra canilla. Volvé a apoyarla en esta.',
+    SESSION_UNAVAILABLE: 'No pudimos habilitar el grifo en este momento. Intentá de nuevo en unos segundos.',
+    INSUFFICIENT_STOCK: 'Esta canilla se está quedando sin cerveza. Elegí otra.',
+    NO_ACTIVE_BARREL:   'Esta canilla no está disponible en este momento.',
+    INVALID_FORMAT:     'Por favor, seleccioná un formato de servido válido.',
+    PRICE_NOT_FOUND:    'Este formato no tiene precio vigente configurado.',
+    TRANSACTION_FAILED: 'No pudimos procesar el servido. Intentá nuevamente.',
+    DEFAULT:            'No pudimos completar la operación. Intentá de nuevo.'
+};
+
+function mostrarAviso(texto, tipo = 'error') {
+    const aviso = document.getElementById('terminal-aviso');
+    if (!aviso) {
+        console.warn(`[Aviso ${tipo}]`, texto);
+        return;
+    }
+    aviso.className = `alerta alerta-${tipo}`;
+    aviso.textContent = texto;
+    aviso.hidden = false;
+    clearTimeout(mostrarAviso._t);
+    mostrarAviso._t = setTimeout(() => {
+        aviso.hidden = true;
+    }, 6000);
+}
 
 // Estado reactivo de la terminal
 const terminalState = {
@@ -118,15 +149,18 @@ function renderizarCanillas() {
         return;
     }
 
+    const esc = window.escapeHTML || ((v) => v);
+
     canillasContainer.innerHTML = terminalState.canillas.map(c => {
         const id = c.id_canilla || c.numero;
         const nombreCerveza = c.nombre_cerveza || c.estilo || 'Sin Barril';
         const isSelected = id === terminalState.canillaSeleccionada;
         const hasBarril = Boolean(c.id_barril && c.estado === 'Activa');
         return `
-            <button type="button" class="canilla-btn-chip ${isSelected ? 'selected' : ''} ${!hasBarril ? 'inactiva' : ''}" data-canilla="${id}">
-                <span class="canilla-chip-num">Canilla #${c.numero || id}</span>
-                <span class="canilla-chip-name">${nombreCerveza}</span>
+            <button type="button" class="canilla-btn-chip ${isSelected ? 'selected' : ''} ${!hasBarril ? 'inactiva' : ''}" 
+                    data-canilla="${esc(id)}" aria-pressed="${isSelected}">
+                <span class="canilla-chip-num">Canilla #${esc(c.numero || id)}</span>
+                <span class="canilla-chip-name">${esc(nombreCerveza)}</span>
             </button>
         `;
     }).join('');
@@ -141,19 +175,26 @@ function renderizarTarjetasPreset() {
         return;
     }
 
+    const esc = window.escapeHTML || ((v) => v);
+
     tarjetasContainer.innerHTML = terminalState.tarjetas.map(t => {
         const isSelected = t.uid === terminalState.tarjetaSeleccionada;
         const saldoNum = Number(t.saldo) || 0;
+        const textoSaldo = saldoNum > 0 
+            ? `$${saldoNum.toLocaleString('es-AR', { minimumFractionDigits: 2 })}` 
+            : '$0,00 (Sin saldo)';
+
         return `
-            <div class="preset-card-item ${isSelected ? 'selected' : ''}" data-uid="${t.uid}">
+            <button type="button" class="preset-card-item ${isSelected ? 'selected' : ''}" 
+                    data-uid="${esc(t.uid)}" aria-pressed="${isSelected}" style="width: 100%; text-align: left; background: var(--bg-card); border: 1px solid var(--border-color); cursor: pointer; display: flex; justify-content: space-between; align-items: center; padding: 0.6rem 0.8rem; border-radius: var(--radius-sm); margin-bottom: 0.4rem;">
                 <div>
-                    <span class="preset-card-uid">${t.uid}</span>
-                    <span style="margin-left: 0.5rem; color: var(--text-secondary); font-size: 0.78rem;">${t.titular}</span>
+                    <span class="preset-card-uid" style="font-family: monospace; font-weight: 700; color: var(--primary);">${esc(t.uid)}</span>
+                    <span style="margin-left: 0.5rem; color: var(--text-secondary); font-size: 0.78rem;">${esc(t.titular)}</span>
                 </div>
-                <div style="font-weight: 700; color: ${saldoNum > 0 ? 'var(--color-success)' : 'var(--color-error)'};">
-                    $${saldoNum.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                <div style="font-weight: 700; color: ${saldoNum > 0 ? 'var(--color-success)' : 'var(--color-error)'}; font-size: 0.85rem;">
+                    ${textoSaldo}
                 </div>
-            </div>
+            </button>
         `;
     }).join('');
 }
@@ -167,14 +208,17 @@ function renderizarFormatos() {
         return;
     }
 
+    const esc = window.escapeHTML || ((v) => v);
+
     formatosContainer.innerHTML = terminalState.formatos.map(f => {
         const isSelected = terminalState.formatoSeleccionado && f.id === terminalState.formatoSeleccionado.id;
         const precioNum = Number(f.precio) || 0;
         return `
-            <button type="button" class="formato-btn ${isSelected ? 'selected' : ''}" data-formato-id="${f.id}">
-                <span class="formato-icon">${f.icon || '🍺'}</span>
-                <span class="formato-nombre">${f.nombre}</span>
-                <span class="formato-volumen">${f.ml} ml</span>
+            <button type="button" class="formato-btn ${isSelected ? 'selected' : ''}" 
+                    data-formato-id="${esc(f.id)}" aria-pressed="${Boolean(isSelected)}">
+                <span class="formato-icon">${esc(f.icon || '🍺')}</span>
+                <span class="formato-nombre">${esc(f.nombre)}</span>
+                <span class="formato-volumen">${esc(f.ml)} ml</span>
                 <span class="formato-precio">$${precioNum.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
             </button>
         `;
@@ -221,7 +265,7 @@ function asignarEventosNFC() {
     document.getElementById('btn-tap-nfc')?.addEventListener('click', () => {
         const uid = terminalState.tarjetaSeleccionada || document.getElementById('input-nfc-custom')?.value.trim();
         if (!uid) {
-            alert('Por favor seleccione o ingrese el UID de una tarjeta NFC.');
+            mostrarAviso('Por favor seleccione o ingrese el UID de una tarjeta NFC.', 'info');
             return;
         }
         ejecutarTapNFC(uid, terminalState.canillaSeleccionada);
@@ -229,7 +273,7 @@ function asignarEventosNFC() {
 
     // Cancelar sesión
     document.getElementById('btn-cancelar-sesion')?.addEventListener('click', () => {
-        finalizarSesion('Sesión cancelada manualmente por el usuario.');
+        finalizarSesion('Sesión cancelada manualmente.');
     });
 
     // Selección de formato
@@ -252,8 +296,11 @@ function asignarEventosNFC() {
     // Cerrar modal de ticket
     document.getElementById('btn-cerrar-modal')?.addEventListener('click', () => {
         const modal = document.getElementById('ticket-modal');
-        if (modal) modal.style.display = 'none';
-        finalizarSesion('Servido finalizado con éxito.');
+        if (modal) {
+            if (typeof modal.close === 'function') modal.close();
+            else modal.style.display = 'none';
+        }
+        finalizarSesion();
     });
 
     // Descargar PDF de ticket (Día 5)
@@ -297,14 +344,15 @@ async function ejecutarTapNFC(idTarjeta, idCanilla) {
             // Éxito: Activar panel de sesión y cuenta regresiva
             terminalState.sesionActiva = data;
             iniciarCuentaRegresiva(data.ttl_segundos || 45);
+            mostrarAviso(`¡Bienvenido/a ${data.cliente_nombre || ''}! Grifo habilitado.`, 'exito');
         } else {
-            // Manejo de errores específicos (Inactiva, Saldo Insuficiente, Inexistente)
-            const msg = data.error || 'No se pudo autenticar la tarjeta NFC.';
-            alert(`⚠️ Error NFC (${data.codigo || response.status}):\n${msg}`);
+            // Manejo de errores amigables (sin alert ni códigos técnicos F-11)
+            const mensajeAmigable = MENSAJES[data.codigo] || data.error || MENSAJES.DEFAULT;
+            mostrarAviso(mensajeAmigable, 'error');
         }
     } catch (err) {
         console.error('Error de red al autenticar NFC:', err);
-        alert('Error de conexión con el servidor backend en http://localhost:3000');
+        mostrarAviso('No pudimos conectar con el servidor. Verifique la conexión.', 'error');
     } finally {
         if (btnTap) {
             btnTap.disabled = false;
@@ -348,7 +396,7 @@ function iniciarCuentaRegresiva(ttlInicial = 45) {
         if (terminalState.segundosRestantes <= 0) {
             clearInterval(terminalState.timerInterval);
             terminalState.timerInterval = null;
-            finalizarSesion('⚠️ La sesión ha expirado (TTL de 45 segundos agotado en Redis). Grifo cerrado por seguridad.');
+            finalizarSesion('Se terminó el tiempo para servirte. El grifo se ha cerrado por seguridad.');
         }
     }, 1000);
 }
@@ -357,8 +405,14 @@ function actualizarVisualTimer(segundos, total) {
     const numDisplay = document.getElementById('countdown-number');
     const fillBar = document.getElementById('countdown-progress-fill');
     const box = document.getElementById('countdown-box');
+    const anuncioLive = document.getElementById('countdown-anuncio');
 
     if (numDisplay) numDisplay.textContent = `${segundos}s`;
+
+    // F-15: Anuncio accesible para lectores de pantalla en 15 y 5 segundos
+    if (anuncioLive && (segundos === 15 || segundos === 5)) {
+        anuncioLive.textContent = `Quedan ${segundos} segundos para servirte.`;
+    }
 
     const porcentaje = Math.max(0, (segundos / total) * 100);
     if (fillBar) fillBar.style.width = `${porcentaje}%`;
@@ -393,7 +447,7 @@ function finalizarSesion(mensajeNotificacion = null) {
     if (animationBox) animationBox.style.display = 'none';
 
     if (mensajeNotificacion) {
-        alert(mensajeNotificacion);
+        mostrarAviso(mensajeNotificacion, 'info');
     }
 }
 
@@ -402,14 +456,14 @@ function finalizarSesion(mensajeNotificacion = null) {
  */
 async function ejecutarDespacho() {
     if (!terminalState.sesionActiva) {
-        alert('No hay una sesión NFC activa para autorizar el servido.');
+        mostrarAviso('No hay una sesión NFC activa para autorizar el servido.', 'error');
         return;
     }
 
     const { formatoSeleccionado, canillaSeleccionada, sesionActiva } = terminalState;
 
     if (!formatoSeleccionado) {
-        alert('Por favor seleccione un formato de servicio.');
+        mostrarAviso('Por favor seleccione un formato de servicio.', 'info');
         return;
     }
 
@@ -417,7 +471,7 @@ async function ejecutarDespacho() {
 
     // Validar saldo suficiente
     if (sesionActiva.saldo_disponible < precioMonto) {
-        alert(`Saldo insuficiente ($${sesionActiva.saldo_disponible}) para el formato seleccionado ($${precioMonto}).`);
+        mostrarAviso(`No tenés saldo suficiente ($${sesionActiva.saldo_disponible.toFixed(2)}) para el formato seleccionado ($${precioMonto.toFixed(2)}).`, 'error');
         return;
     }
 
@@ -447,9 +501,6 @@ async function ejecutarDespacho() {
 
         const data = await response.json();
 
-        // Pausa breve para animación cervecera de llenado
-        await new Promise(r => setTimeout(r, 2200));
-
         if (response.ok && data.ok) {
             terminalState.ultimoDespacho = data;
             mostrarModalTicket(data);
@@ -469,12 +520,13 @@ async function ejecutarDespacho() {
                 window.dashboardStock.cargarStock();
             }
         } else {
-            alert(`⚠️ Error al servir cerveza (${data.codigo || response.status}):\n${data.error || 'Error en la transacción.'}`);
+            const mensajeError = MENSAJES[data.codigo] || data.error || MENSAJES.TRANSACTION_FAILED;
+            mostrarAviso(mensajeError, 'error');
             finalizarSesion();
         }
     } catch (err) {
         console.error('Error al ejecutar despacho:', err);
-        alert('Error de conexión al procesar el servido.');
+        mostrarAviso('Error de conexión al procesar el servido.', 'error');
         finalizarSesion();
     }
 }
@@ -513,7 +565,12 @@ function mostrarModalTicket(despacho) {
     document.getElementById('modal-saldo-restante').textContent = `$${saldoMonto.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`;
     document.getElementById('modal-cliente').textContent = nombreCliente;
 
-    modal.style.display = 'flex';
+    // F-14: Apertura accesible mediante modal nativo <dialog>
+    if (typeof modal.showModal === 'function') {
+        modal.showModal();
+    } else {
+        modal.style.display = 'flex';
+    }
 }
 
 // Exponer para la navegación reactiva entre vistas

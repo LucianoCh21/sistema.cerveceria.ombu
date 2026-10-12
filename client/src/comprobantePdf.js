@@ -4,7 +4,9 @@
  */
 
 const ComprobanteManager = {
-    API_BASE: 'http://localhost:3000/api',
+    get API_BASE() {
+        return (window.OMBU_CONFIG && window.OMBU_CONFIG.API_BASE) || 'http://localhost:3000/api';
+    },
 
     /**
      * Abre el comprobante PDF oficial emitido por el backend en una nueva pestaña
