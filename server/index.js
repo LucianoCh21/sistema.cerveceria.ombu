@@ -10,6 +10,7 @@ const despachoRoutes = require('./routes/despachoRoutes');
 const barrilRoutes = require('./routes/barrilRoutes');
 const stockRoutes = require('./routes/stockRoutes');
 const { iniciarConsumidor } = require('./workers/stockConsumer');
+const { iniciarOutboxPublisher } = require('./workers/outboxPublisher');
 
 const { requireRole } = require('./middleware/auth');
 
@@ -64,3 +65,4 @@ app.listen(PORT, () => {
 });
 
 iniciarConsumidor().then(() => console.log('Consumidor RabbitMQ iniciado')).catch(console.error);
+iniciarOutboxPublisher();

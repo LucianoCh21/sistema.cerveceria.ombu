@@ -114,6 +114,31 @@ PRIMARY KEY CLUSTERED
 )WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
 ) ON [PRIMARY]
 GO
+/****** Objeto: Table [dbo].[EventoOutbox] - Patrón Transactional Outbox (F-07) ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE TABLE [dbo].[EventoOutbox](
+	[id_evento] [bigint] IDENTITY(1,1) NOT NULL,
+	[tipo] [varchar](60) NOT NULL,
+	[payload] [nvarchar](max) NOT NULL,
+	[creado_en] [datetime2](7) NOT NULL CONSTRAINT [DF_EventoOutbox_CreadoEn] DEFAULT (sysdatetime()),
+	[publicado_en] [datetime2](7) NULL,
+	[intentos] [int] NOT NULL CONSTRAINT [DF_EventoOutbox_Intentos] DEFAULT ((0)),
+PRIMARY KEY CLUSTERED 
+(
+	[id_evento] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY]
+GO
+CREATE NONCLUSTERED INDEX [IX_Outbox_Pendientes] ON [dbo].[EventoOutbox]
+(
+	[publicado_en] ASC
+)
+WHERE ([publicado_en] IS NULL)
+ON [PRIMARY]
+GO
 /****** Objeto: Table [dbo].[Empleado] Fecha de script: 17/9/2026 20:43:35 ******/
 SET ANSI_NULLS ON
 GO

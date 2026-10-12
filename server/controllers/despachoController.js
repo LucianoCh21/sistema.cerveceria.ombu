@@ -195,13 +195,7 @@ const crearDespacho = async (req, res) => {
 
             const despachoInsertado = resDespacho.recordset[0];
 
-            // 7. Confirmar transacción atómica en SQL Server
-            await transaction.commit();
-
-            // 8. Eliminar la sesión efímera de Redis (el grifo se cierra)
-            await deleteNfcSession(idTarjeta);
-
-            // 9. Construir y emitir evento asíncrono hacia RabbitMQ (Exchange 'ombu.eventos')
+            // 7. Construir evento de dominio para emisión asíncrona segura
             const eventoPayload = {
                 eventId: `evt-${Date.now()}-${despachoInsertado.id_despacho}`,
                 eventType: "DespachoRealizado",
@@ -223,7 +217,20 @@ const crearDespacho = async (req, res) => {
                 }
             };
 
-            const eventoPublicado = await publishDespachoRealizado(eventoPayload);
+            // F-07 (Patrón Transactional Outbox): Insertar evento dentro de la misma transacción SQL
+            await new sql.Request(transaction)
+                .input('tipo', sql.VarChar(60), 'DespachoRealizado')
+                .input('payload', sql.NVarChar(sql.MAX), JSON.stringify(eventoPayload))
+                .query(`
+                    INSERT INTO EventoOutbox (tipo, payload)
+                    VALUES (@tipo, @payload)
+                `);
+
+            // 8. Confirmar transacción atómica en SQL Server (Débito + Despacho + Outbox)
+            await transaction.commit();
+
+            // 9. Eliminar la sesión efímera de Redis (el grifo se cierra de inmediato)
+            await deleteNfcSession(idTarjeta);
 
             // 10. Construir respuesta exitosa con todos los campos necesarios para la UI
             const clienteNombre = sesion?.cliente_nombre || (tarjetaActualizada.id_cliente ? 'Cliente Ombú' : 'Consumidor Final');
@@ -246,7 +253,7 @@ const crearDespacho = async (req, res) => {
                 precio_cobrado: precioCobrado,
                 saldo_restante: Number(tarjetaActualizada.saldo_actual),
                 comprobante_url: `/api/despachos/${despachoInsertado.id_despacho}/comprobante`,
-                evento_rabbit_publicado: eventoPublicado,
+                evento_outbox_registrado: true,
                 fecha_hora: despachoInsertado.fecha_hora
             };
 
