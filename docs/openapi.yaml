@@ -3,9 +3,10 @@ info:
   title: API Tap Wall - Cervecería Ombú
   description: >
     Especificación OpenAPI 3.0 para el sistema de autoservicio de cerveza con tarjetas NFC (Tap Wall).
-    Documenta el Módulo de Lecturas NFC, Despachos, Comprobantes Digitales y la integración con el Broker RabbitMQ
-    conforme a las remediaciones ISO/IEC 25010 (F-02, F-03, F-04, F-06, F-07, F-20).
-  version: 2.0.0
+    Documenta el Módulo de Lecturas NFC, Despachos, Comprobantes Digitales, Canillas, Barriles,
+    Control de Stock, Salud del Sistema y la integración asíncrona con el Broker RabbitMQ
+    conforme a los lineamientos de calidad de la norma ISO/IEC 25010 (F-01 a F-21).
+  version: 2.1.0
   contact:
     name: Lucrecia Sabrina Mencia & Luciano Rubén Chesani
     email: grupo1@ombu.cerveceria.com
@@ -22,10 +23,389 @@ tags:
     description: Autenticación de tarjetas, sesiones efímeras (TTL 45s en Redis) y formatos
   - name: Despachos
     description: Débito transaccional, cálculo oficial de precios y comprobantes en PDF
+  - name: Canillas
+    description: Gestión física, alta y consulta del muro de canillas (Tap Wall)
+  - name: Barriles
+    description: Asignación, conexión atómica concurrente y retiro de barriles
+  - name: Stock
+    description: Monitoreo en tiempo real de niveles de inventario y remanentes
+  - name: Infraestructura
+    description: Diagnóstico de salud y resiliencia de servicios dependientes (F-09)
   - name: Eventos Asíncronos
     description: Publicación garantizada de eventos de dominio mediante Transactional Outbox
 
 paths:
+  /api/health:
+    get:
+      tags:
+        - Infraestructura
+      summary: Chequeo de salud del sistema y dependencias (F-09)
+      description: >
+        Realiza pings activos hacia SQL Server (SELECT 1), Redis (PING) y RabbitMQ (AMQP connection).
+        Si los tres responden adecuadamente, retorna HTTP 200 con estado 'ok'.
+        Si alguno de los servicios falla o agota el tiempo de espera, retorna HTTP 503 con estado 'caido'.
+      operationId: checkHealth
+      responses:
+        '200':
+          description: Todos los servicios e infraestructura se encuentran operativos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        '503':
+          description: Uno o más servicios esenciales se encuentran caídos o inaccesibles
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /api/canillas:
+    get:
+      tags:
+        - Canillas
+      summary: Listar todas las canillas físicas y barril conectado
+      description: >
+        Retorna la lista de canillas físicas ordenadas por número, junto con los datos
+        del barril conectado actualmente, variedad y estilo de cerveza.
+      operationId: getCanillas
+      responses:
+        '200':
+          description: Lista de canillas obtenida exitosamente
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CanillaItem'
+        '500':
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      tags:
+        - Canillas
+      summary: Registrar una nueva canilla física
+      description: >
+        Da de alta un grifo físico en el sistema. Requiere token con rol administrativo.
+      operationId: createCanilla
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CanillaCreateRequest'
+      responses:
+        '201':
+          description: Canilla registrada exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Canilla creada exitosamente"
+        '400':
+          description: Faltan campos obligatorios
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: No autenticado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Requiere rol administrativo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/canillas/{id}:
+    get:
+      tags:
+        - Canillas
+      summary: Consultar una canilla por su ID
+      operationId: getCanillaById
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID de la canilla
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Detalle de la canilla
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CanillaItem'
+        '404':
+          description: Canilla no encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    put:
+      tags:
+        - Canillas
+      summary: Actualizar estado o número de una canilla
+      operationId: updateCanilla
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID de la canilla
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CanillaCreateRequest'
+      responses:
+        '200':
+          description: Canilla modificada exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Canilla actualizada exitosamente"
+        '400':
+          description: Parámetros inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Canilla no encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags:
+        - Canillas
+      summary: Baja lógica de canilla (desactivación)
+      operationId: deleteCanilla
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID de la canilla a dar de baja
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Canilla pasada a estado Inactiva
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Canilla pasada a estado Inactiva exitosamente"
+        '404':
+          description: Canilla no encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/barriles:
+    get:
+      tags:
+        - Barriles
+      summary: Listar todos los barriles activos (no retirados)
+      description: >
+        Consulta el stock de barriles con estado distinto de 'Retirado'.
+        Requiere rol administrativo (admin).
+      operationId: getBarriles
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Lista de barriles disponibles o conectados
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BarrilItem'
+        '401':
+          description: No autenticado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Requiere rol administrativo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/barriles/conectar:
+    post:
+      tags:
+        - Barriles
+      summary: Conectar un barril a una canilla física (Transacción SERIALIZABLE)
+      description: >
+        Aplica un bloqueo estricto con nivel SERIALIZABLE y WITH (UPDLOCK, HOLDLOCK)
+        para impedir que dos operadores asignen barriles concurrentemente sobre la misma canilla (RN-03).
+        Asigna fecha de conexión y el ID del empleado autenticado que ejecutó la maniobra.
+      operationId: conectarBarril
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConectarBarrilRequest'
+      responses:
+        '200':
+          description: Barril conectado exitosamente a la canilla
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Barril conectado exitosamente."
+        '400':
+          description: Parámetros faltantes o la canilla ya posee un barril conectado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Barril no encontrado o se encuentra en estado Retirado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/barriles/{id}:
+    delete:
+      tags:
+        - Barriles
+      summary: Desconectar y retirar un barril (Baja lógica / Soft Delete)
+      description: >
+        Actualiza el estado del barril a 'Retirado', desvincula la canilla (id_canilla = NULL)
+        y registra la fecha y hora de desconexión sin destruir el historial contable.
+      operationId: retirarBarril
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID del barril a retirar
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Barril retirado exitosamente (sin contenido)
+        '400':
+          description: El barril ya se encuentra en estado Retirado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Barril no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/stock/resumen:
+    get:
+      tags:
+        - Stock
+      summary: Obtener resumen del stock de barriles con caché Redis y fallback SQL
+      description: >
+        Provee el estado de volumen y porcentaje de llenado de cada canilla.
+        Lee desde la clave en memoria Redis 'stock:muro:resumen' (TTL 60s). Si la caché
+        no responde, degrada controladamente consultando SQL Server y regenerando la clave (RNF-14).
+      operationId: getStockResumen
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Resumen de inventario obtenido con éxito
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockResumenResponse'
+        '500':
+          description: Error crítico al consultar base de datos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /api/nfc/autenticar:
     post:
       tags:
@@ -293,6 +673,188 @@ components:
       description: Tokens por rol preconfigurados (TERMINAL_TOKEN o ADMIN_TOKEN)
 
   schemas:
+    HealthResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          example: true
+        servicios:
+          type: object
+          properties:
+            sqlserver:
+              type: string
+              example: "ok"
+            redis:
+              type: string
+              example: "ok"
+            rabbitmq:
+              type: string
+              example: "ok"
+
+    CanillaItem:
+      type: object
+      properties:
+        id_canilla:
+          type: integer
+          example: 1
+        numero:
+          type: integer
+          example: 1
+        estado:
+          type: string
+          example: "Activa"
+        fecha_alta:
+          type: string
+          format: date
+        id_barril:
+          type: integer
+          nullable: true
+          example: 1
+        litros_restantes:
+          type: number
+          nullable: true
+          example: 48.50
+        litros_totales:
+          type: number
+          nullable: true
+          example: 50.00
+        estado_barril:
+          type: string
+          nullable: true
+          example: "Conectado"
+        id_cerveza:
+          type: integer
+          nullable: true
+          example: 2
+        estilo:
+          type: string
+          nullable: true
+          example: "IPA Pampeana"
+        variedad:
+          type: string
+          nullable: true
+          example: "Session"
+        ibu:
+          type: integer
+          nullable: true
+          example: 45
+        abv:
+          type: number
+          nullable: true
+          example: 5.4
+
+    CanillaCreateRequest:
+      type: object
+      required:
+        - numero
+        - estado
+      properties:
+        numero:
+          type: integer
+          example: 5
+        estado:
+          type: string
+          enum: [Activa, Mantenimiento, Inactiva]
+          example: "Activa"
+
+    BarrilItem:
+      type: object
+      properties:
+        id_barril:
+          type: integer
+          example: 8
+        id_cerveza:
+          type: integer
+          example: 1
+        id_canilla:
+          type: integer
+          nullable: true
+          example: 2
+        id_empleado_conexion:
+          type: integer
+          example: 1
+        litros_totales:
+          type: number
+          example: 50.00
+        litros_restantes:
+          type: number
+          example: 50.00
+        fecha_conexion:
+          type: string
+          format: date-time
+        fecha_desconexion:
+          type: string
+          format: date-time
+          nullable: true
+        estado:
+          type: string
+          enum: [Conectado, Agotado, Retirado]
+          example: "Conectado"
+
+    ConectarBarrilRequest:
+      type: object
+      required:
+        - id_barril
+        - id_canilla
+        - id_empleado_conexion
+      properties:
+        id_barril:
+          type: integer
+          example: 8
+        id_canilla:
+          type: integer
+          example: 2
+        id_empleado_conexion:
+          type: integer
+          description: ID del empleado responsable de la conexión (F-14)
+          example: 1
+
+    StockResumenResponse:
+      type: object
+      properties:
+        origen:
+          type: string
+          enum: [redis-cache, sql-server]
+          example: "redis-cache"
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/StockCanillaItem'
+
+    StockCanillaItem:
+      type: object
+      properties:
+        id_canilla:
+          type: integer
+          example: 1
+        numero_canilla:
+          type: integer
+          example: 1
+        estado_canilla:
+          type: string
+          example: "Activa"
+        id_barril:
+          type: integer
+          nullable: true
+          example: 2
+        litros_totales:
+          type: number
+          nullable: true
+          example: 50.00
+        litros_restantes:
+          type: number
+          nullable: true
+          example: 45.50
+        estado_barril:
+          type: string
+          nullable: true
+          example: "Conectado"
+        nombre_cerveza:
+          type: string
+          nullable: true
+          example: "Golden Ale"
+
     AutenticarNFCRequest:
       type: object
       required:
