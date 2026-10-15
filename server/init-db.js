@@ -92,7 +92,7 @@ async function initDatabase() {
         const tables = [
             'Proveedor', 'EstiloCerveza', 'Cerveza', 'FormatoServicio', 
             'PrecioCerveza', 'Empleado', 'Canilla', 'Barril', 
-            'Cliente', 'TarjetaNFC', 'Recarga', 'Despacho'
+            'Cliente', 'TarjetaNFC', 'Recarga', 'Despacho', 'EventoOutbox'
         ];
         
         for (const t of tables) {

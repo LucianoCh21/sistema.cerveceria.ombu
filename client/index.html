@@ -6,6 +6,9 @@
     <title>Ombú - Cervecería de Barrio | Muro de Canillas</title>
     <!-- Hoja de estilos visuales de Ombú -->
     <link rel="stylesheet" href="src/styles.css">
+    <!-- Configuración y Utilitarios Compartidos (F-05, F-21) -->
+    <script src="src/config.js"></script>
+    <script src="src/utils/escapeHTML.js"></script>
 </head>
 <body>
     <div class="app-container">
@@ -32,8 +35,8 @@
                 <a href="#terminal-nfc" class="nav-link" id="nav-link-nfc">
                     <span>📲</span> Lecturas NFC (Tap Wall)
                 </a>
-                <a href="#" class="nav-link">
-                    <span>⚙️</span> Configuración
+                <a href="#" class="nav-link" aria-disabled="true" style="opacity: 0.6; cursor: not-allowed;">
+                    <span>⚙️</span> Configuración (próximamente)
                 </a>
             </nav>
 
@@ -165,6 +168,9 @@
                             </div>
                         </div>
 
+                        <!-- F-11: Contenedor accesible para notificaciones sin alert() -->
+                        <div id="terminal-aviso" class="alerta" role="alert" aria-live="assertive" hidden></div>
+
                         <!-- Grid de Operación -->
                         <div class="terminal-grid">
                             <!-- Columna 1: Simulador de Hardware NFC -->
@@ -172,19 +178,19 @@
                                 <h3><span>🎛️</span> Panel de Lector NFC Físico</h3>
 
                                 <!-- Paso 1: Elegir Canilla -->
-                                <div class="canilla-select-group">
-                                    <label>1. Seleccione la Canilla Activa:</label>
+                                <fieldset class="canilla-select-group" style="border: none; padding: 0;">
+                                    <legend style="font-size: 0.88rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.5rem;">1. Seleccione la Canilla Activa:</legend>
                                     <div id="canillas-selector-grid" class="canilla-selector-grid"></div>
-                                </div>
+                                </fieldset>
 
                                 <!-- Paso 2: Zona de Aproximación NFC -->
-                                <div class="canilla-select-group">
-                                    <label>2. Tarjeta NFC del Cliente:</label>
+                                <fieldset class="canilla-select-group" style="border: none; padding: 0;">
+                                    <legend style="font-size: 0.88rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.5rem;">2. Tarjeta NFC del Cliente:</legend>
                                     <div class="nfc-tap-zone">
                                         <div class="nfc-tap-icon">📲</div>
-                                        <div style="font-size: 0.88rem; color: var(--text-secondary);">
+                                        <label for="input-nfc-custom" style="font-size: 0.88rem; color: var(--text-secondary); cursor: pointer;">
                                             Lector de Radiofrecuencia RFID / NFC 13.56 MHz
-                                        </div>
+                                        </label>
                                         <div style="width: 100%;">
                                             <input 
                                                 type="text" 
@@ -192,17 +198,18 @@
                                                 class="form-input" 
                                                 placeholder="UID Físico (ej: A1B2C3D4E5)" 
                                                 value=""
+                                                aria-label="UID de Tarjeta NFC"
                                                 style="text-align: center; font-family: monospace; font-weight: 700; letter-spacing: 0.1em;"
                                             >
                                         </div>
                                     </div>
-                                </div>
+                                </fieldset>
 
                                 <!-- Tarjetas de Prueba Rápida -->
-                                <div class="canilla-select-group">
-                                    <label style="font-size: 0.78rem;">Tarjetas registradas en base de datos (Click para seleccionar):</label>
+                                <fieldset class="canilla-select-group" style="border: none; padding: 0;">
+                                    <legend style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Tarjetas registradas en base de datos (Click para seleccionar):</legend>
                                     <div id="preset-cards-list" class="preset-cards-list"></div>
-                                </div>
+                                </fieldset>
 
                                 <!-- Botón de Tap -->
                                 <button type="button" id="btn-tap-nfc" class="btn-tap-nfc">
@@ -248,6 +255,8 @@
                                     <div id="countdown-box" class="countdown-box">
                                         <div class="countdown-label">Tiempo de Apertura del Grifo (TTL Redis)</div>
                                         <div id="countdown-number" class="countdown-number">45s</div>
+                                        <!-- F-15: Anunciador accesible para lectores de pantalla -->
+                                        <div id="countdown-anuncio" class="sr-only" aria-live="assertive"></div>
                                         <div class="countdown-progress-bar">
                                             <div id="countdown-progress-fill" class="countdown-progress-fill"></div>
                                         </div>
@@ -257,10 +266,10 @@
                                     </div>
 
                                     <!-- Selección de Formato y Servido (Día 5) -->
-                                    <div class="canilla-select-group">
-                                        <label>Seleccione el formato a servir:</label>
+                                    <fieldset class="canilla-select-group" style="border: none; padding: 0;">
+                                        <legend style="font-size: 0.88rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.5rem;">Seleccione el formato a servir:</legend>
                                         <div id="formatos-selector-grid" class="formatos-grid"></div>
-                                    </div>
+                                    </fieldset>
 
                                     <!-- Acción de Servir -->
                                     <button type="button" id="btn-servir-cerveza" class="btn-servir-cerveza">
@@ -293,11 +302,11 @@
                     </section>
                 </div>
 
-                <!-- Modal de Ticket / Comprobante PDF (Día 5) -->
-                <div id="ticket-modal" class="ticket-modal-overlay" style="display: none;">
-                    <div class="ticket-modal-card">
+                <!-- F-14: Modal de Ticket / Comprobante PDF usando elemento nativo <dialog> -->
+                <dialog id="ticket-modal" class="ticket-modal-card" aria-labelledby="ticket-modal-titulo" style="border: none; padding: 0; background: transparent;">
+                    <div class="ticket-modal-content">
                         <div class="ticket-header">
-                            <h3><span>✅</span> ¡Servido Exitoso!</h3>
+                            <h3 id="ticket-modal-titulo"><span>✅</span> ¡Servido Exitoso!</h3>
                             <p>Cervecería Ombú — Tap Wall Autoservicio</p>
                         </div>
                         <div class="ticket-body-table">
@@ -335,31 +344,20 @@
                             </button>
                         </div>
                     </div>
-                </div>
+                </dialog>
             </div>
         </main>
     </div>
 
     <!-- Lógica de interacción con el backend -->
     <script>
-        const API_URL = 'http://localhost:3000/api/canillas';
+        const API_URL = (window.OMBU_CONFIG ? window.OMBU_CONFIG.API_BASE : 'http://localhost:3000/api') + '/canillas';
 
         const formCanilla = document.getElementById('form-canilla');
         const alertaExito = document.getElementById('alerta-exito');
         const alertaError = document.getElementById('alerta-error');
         const muroCanillas = document.getElementById('muro-canillas');
         const contadorCanillas = document.getElementById('contador-canillas');
-
-        // Función utilitaria de sanitización para prevenir XSS en contenido inyectado
-        function escapeHTML(str) {
-            if (typeof str !== 'string') return str;
-            return str
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;')
-                .replace(/'/g, '&#039;');
-        }
 
         // Función para ocultar y limpiar alertas del formulario
         function ocultarAlertas() {
@@ -497,10 +495,6 @@
                     throw new Error(`El servidor respondió con código ${response.status} (${response.statusText || 'Error en la petición'})`);
                 }
                 const canillas = await response.json();
-
-                // Pausa artificial temporal para demostración y captura de pantalla (2 segundos)
-                await new Promise(resolve => setTimeout(resolve, 2000));
-
                 dibujarMuroCanillas(canillas);
             } catch (error) {
                 console.error('Error al consultar canillas:', error);
