@@ -1,3 +1,4 @@
+const { mililitrosALitros } = require('../domain/volumen');
 const { getConnection, sql } = require('../config/db');
 const { getNfcSession, deleteNfcSession, setIdempotencyResult, getIdempotencyResult } = require('../config/redis');
 const tarjetaRepo = require('../repositories/tarjetaRepo');
@@ -83,7 +84,7 @@ class DespachoService {
 
             const { nombre: formatoNombre, mililitros: mlServidos, precio } = datosPrecio;
             const precioCobrado = Number(precio);
-            const volumenLitros = Number(mlServidos) / 1000.0;
+            const volumenLitros = mililitrosALitros(mlServidos);
 
             if (Number(barrilActivo.litros_restantes) < volumenLitros) {
                 await transaction.rollback();
