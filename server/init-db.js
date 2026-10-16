@@ -3,22 +3,38 @@ const fs = require('fs');
 const path = require('path');
 const { getConnection, dbConfig, sql } = require('./config/db');
 
+// F-10: Validación de seguridad preventiva para evitar destrucción accidental de datos
+const hasForceFlag = process.argv.includes('--force');
+const isProduction = process.env.NODE_ENV === 'production';
+
+if (!hasForceFlag && !isProduction) {
+    console.error('========================================================');
+    console.error('⚠️  [ADVERTENCIA DE SEGURIDAD - F-10]');
+    console.error('Este script destruirá todas las tablas, restricciones y datos de OmbuDB.');
+    console.error('Para confirmar la ejecución destructiva, debe incluir el argumento --force:');
+    console.error('   node init-db.js --force');
+    console.error('   (o: npm run init-db -- --force)');
+    console.error('========================================================');
+    process.exit(1);
+}
+
 async function initDatabase() {
     console.log('========================================================');
     console.log('🍺 Carga e Inicialización de Base de Datos - OmbuDB');
     console.log('========================================================');
 
-    // 1. Buscar el script SQL corregido más reciente
+    // 1. Buscar el script SQL unificado o corregido más reciente
     const candidatePaths = [
-        path.join(__dirname, '../FACULTAD/scripts base de datos/Script_BaseDatos_CerveceriaOmbu_CORREGIDO.sql'),
+        path.join(__dirname, 'db/schema.sql'),
         path.join(__dirname, 'Script_BaseDatos_CerveceriaOmbu_CORREGIDO.sql'),
+        path.join(__dirname, '../FACULTAD/scripts base de datos/Script_BaseDatos_CerveceriaOmbu_CORREGIDO.sql'),
         path.join(__dirname, '../scripts base de datos/Script_BaseDatos_CerveceriaOmbu_CORREGIDO.sql')
     ];
 
     let sqlScriptPath = candidatePaths.find(p => fs.existsSync(p));
 
     if (!sqlScriptPath) {
-        console.error('❌ No se encontró el archivo Script_BaseDatos_CerveceriaOmbu_CORREGIDO.sql');
+        console.error('❌ No se encontró ningún archivo de esquema SQL.');
         console.error('Buscado en:', candidatePaths);
         process.exit(1);
     }

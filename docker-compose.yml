@@ -15,6 +15,11 @@ services:
       - mssql_data:/var/opt/mssql
     networks:
       - ombu-network
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2048M
 
   redis:
     image: redis:7-alpine
@@ -22,11 +27,16 @@ services:
     restart: always
     command: ["redis-server", "--appendonly", "yes"]
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
     networks:
       - ombu-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
 
   rabbitmq:
     image: rabbitmq:3-management-alpine
@@ -36,12 +46,98 @@ services:
       - RABBITMQ_DEFAULT_USER=guest
       - RABBITMQ_DEFAULT_PASS=guest
     ports:
-      - "5672:5672"     # Puerto estándar AMQP 0-9-1
-      - "15672:15672"   # Panel Web de Gestión (RabbitMQ Management Dashboard)
+      - "${RABBITMQ_PORT:-5672}:5672"       # Puerto estándar AMQP 0-9-1
+      - "${RABBITMQ_MGMT_PORT:-15672}:15672" # Panel Web de Gestión (Management Dashboard)
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     networks:
       - ombu-network
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1024M
+
+  # F-21: Servicio backend API principal (Express)
+  api:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: ombu-api
+    restart: always
+    command: ["node", "index.js"]
+    environment:
+      - PORT=3000
+      - DB_SERVER=sqlserver
+      - DB_PORT=1433
+      - DB_USER=sa
+      - DB_PASSWORD=${DB_PASSWORD:-TuPassword123!}
+      - DB_DATABASE=OmbuDB
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672
+      - CLIENT_ORIGIN=http://localhost:${CLIENT_PORT:-8080}
+    ports:
+      - "${PORT:-3000}:3000"
+    depends_on:
+      - sqlserver
+      - redis
+      - rabbitmq
+    networks:
+      - ombu-network
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+
+  # F-21: Servicio de procesamiento asíncrono en background (RabbitMQ Worker)
+  worker:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: ombu-worker
+    restart: always
+    command: ["node", "workers/stockConsumer.js"]
+    environment:
+      - DB_SERVER=sqlserver
+      - DB_PORT=1433
+      - DB_USER=sa
+      - DB_PASSWORD=${DB_PASSWORD:-TuPassword123!}
+      - DB_DATABASE=OmbuDB
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672
+    depends_on:
+      - sqlserver
+      - redis
+      - rabbitmq
+    networks:
+      - ombu-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+  # F-21: Servicio frontend estático servido por servidor web Nginx
+  client:
+    image: nginx:alpine
+    container_name: ombu-client
+    restart: always
+    ports:
+      - "${CLIENT_PORT:-8080}:80"
+    volumes:
+      - ./client:/usr/share/nginx/html:ro
+    depends_on:
+      - api
+    networks:
+      - ombu-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 128M
 
 volumes:
   mssql_data:

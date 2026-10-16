@@ -9,10 +9,11 @@ npm-debug.log
 .DS_Store
 Thumbs.db
 
-node_modules/
-.env
-
-# Carpetas de estudio / universidad
+# Carpetas de estudio / universidad / informes locales
 FACULTAD/
 facultad/
 docs/
+scripts/
+INFORME_CAMBIOS_INTEGRACION*
+INFORME_AE3*
+evaluacion_calidad_iso25000*
