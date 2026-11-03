@@ -33,6 +33,13 @@ app.use(cors({
 }));
 app.use(express.json());
 
+// Cabeceras de seguridad globales (Anti-sniffing y Anti-clickjacking)
+app.use((req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    next();
+});
+
 // F-09: Endpoint GET /api/health con verificación activa de dependencias (SQL Server, Redis y RabbitMQ)
 app.get('/api/health', async (req, res) => {
     let sqlserverStatus = 'ok';

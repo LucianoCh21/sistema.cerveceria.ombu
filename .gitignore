@@ -15,6 +15,8 @@ facultad/
 
 docs/
 scripts/
+*.pdf
 INFORME_CAMBIOS_INTEGRACION*
 INFORME_AE3*
+INFORME_TECNICO_ISO25010*
 evaluacion_calidad_iso25000*
