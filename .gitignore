@@ -21,3 +21,6 @@ INFORME_AE3*
 INFORME_TECNICO_ISO25010*
 INFORME_ESTRES_COMPARATIVO*
 evaluacion_calidad_iso25000*
+
+# Archivos generados por deploy/levantar.sh (tokens, URL del túnel, logs)
+deploy/runtime/

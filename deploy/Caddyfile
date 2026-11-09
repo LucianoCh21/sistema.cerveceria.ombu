@@ -1,0 +1,32 @@
+# Punto de entrada único de Cervecería Ombú (AE4).
+#
+# SITE_ADDRESS (deploy/.env) elige el modo:
+#   ":80"              -> modo túnel: HTTP plano; el HTTPS lo pone Cloudflare Tunnel.
+#   "ombu.midominio.com" -> modo VM: Caddy obtiene el certificado TLS automáticamente
+#                          (requiere 80/443 públicos y DNS apuntando a la VM).
+
+{$SITE_ADDRESS} {
+	encode gzip
+
+	header {
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+
+	# basic_auth SOLO para las páginas estáticas: /api/* queda fuera porque la API
+	# ya usa su propio header "Authorization: Bearer" y ambos chocarían.
+	@estaticos not path /api/*
+	basic_auth @estaticos {
+		{$BASIC_AUTH_USER} {$BASIC_AUTH_HASH}
+	}
+
+	handle /api/* {
+		reverse_proxy api:3000
+	}
+
+	handle {
+		reverse_proxy client:80
+	}
+}
