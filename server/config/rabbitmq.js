@@ -5,6 +5,9 @@ const rabbitUrl = process.env.RABBITMQ_URL || 'amqp://guest:guest@localhost:5672
 const EXCHANGE_NAME = process.env.RABBITMQ_EXCHANGE || 'ombu.eventos';
 const ROUTING_KEY_DESPACHO = 'despacho.confirmado';
 
+// Evita que la contraseña de la URL AMQP aparezca en los logs (RNF-23).
+const ocultarCredenciales = (url) => String(url).replace(/\/\/([^:@/]+):[^@]*@/, '//$1:***@');
+
 let connection = null;
 let channel = null;
 
@@ -32,7 +35,7 @@ const getRabbitChannel = async () => {
         console.log(`[RabbitMQ] Canal establecido. Exchange '${EXCHANGE_NAME}' verificado.`);
         return channel;
     } catch (error) {
-        console.warn(`[RabbitMQ] No se pudo establecer conexión inmediata con ${rabbitUrl}: ${error.message}`);
+        console.warn(`[RabbitMQ] No se pudo establecer conexión inmediata con ${ocultarCredenciales(rabbitUrl)}: ${error.message}`);
         channel = null;
         return null;
     }
@@ -78,5 +81,6 @@ module.exports = {
     getRabbitChannel,
     publishDespachoRealizado,
     EXCHANGE_NAME,
-    ROUTING_KEY_DESPACHO
+    ROUTING_KEY_DESPACHO,
+    ocultarCredenciales
 };

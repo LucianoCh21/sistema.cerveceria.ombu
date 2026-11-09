@@ -1,6 +1,7 @@
 const amqp = require('amqplib');
 const { getConnection, sql } = require('../config/db');
 const redisExport = require('../config/redis');
+const { ocultarCredenciales } = require('../config/rabbitmq');
 const redisClient = redisExport.client || redisExport.redisClient || redisExport;
 require('dotenv').config();
 
@@ -18,7 +19,7 @@ const iniciarConsumidor = async () => {
     isConnecting = true;
 
     try {
-        console.log(`[stockConsumer] Conectando a RabbitMQ en ${RABBITMQ_URL}...`);
+        console.log(`[stockConsumer] Conectando a RabbitMQ en ${ocultarCredenciales(RABBITMQ_URL)}...`);
         const connection = await amqp.connect(RABBITMQ_URL);
 
         connection.on('error', (err) => {
