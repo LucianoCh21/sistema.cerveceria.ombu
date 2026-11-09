@@ -59,6 +59,7 @@ services:
     restart: always
     environment:
       - SITE_ADDRESS=${SITE_ADDRESS:-:80}
+      - ACME_EMAIL=${ACME_EMAIL:-sin-email@localhost}
       - BASIC_AUTH_USER=${BASIC_AUTH_USER:?Falta BASIC_AUTH_USER en deploy/.env}
       - BASIC_AUTH_HASH=${BASIC_AUTH_HASH:?levantar.sh calcula BASIC_AUTH_HASH}
     ports:

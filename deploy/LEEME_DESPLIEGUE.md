@@ -53,3 +53,24 @@ Para apagar: `./deploy/apagar.sh`. Apaga el túnel y los contenedores **sin borr
 | `cloudflared no devolvió una URL` | Revisá `deploy/runtime/cloudflared.log` (¿hay internet?). Corré `./deploy/apagar.sh` y después `./deploy/levantar.sh`. |
 
 ⚠️ **Nunca** uses `docker compose down -v`, porque borra la base. **No** vuelvas a usar `--primera-vez` después de cargar datos de la demo.
+
+---
+
+## Modo VM (Azure, HTTPS con Let's Encrypt)
+
+Desde la máquina que tiene la clave SSH de la VM, con un solo comando:
+
+```bash
+./deploy/desplegar_vm.sh <IP> <FQDN> <ACME_EMAIL> --primera-vez   # primera vez (pide escribir BORRAR)
+./deploy/desplegar_vm.sh <IP> <FQDN> <ACME_EMAIL>                 # actualizaciones (conserva datos)
+```
+
+Hace cuatro cosas:
+1. Genera `deploy/runtime/vm.env`, con contraseñas propias de la VM. Es privado y no se commitea.
+2. Corre `deploy/preparar_vm.sh` en la VM: instala Docker, agrega 2 GB de swap y clona la rama.
+3. Copia el `.env` con `scp`.
+4. Ejecuta `./deploy/levantar.sh --vm` en la VM.
+
+Necesita que el DNS del FQDN apunte a la VM y que el NSG tenga abiertos el 22, el 80 y el 443. La URL final es `https://<FQDN>` y no cambia entre reinicios.
+
+Smoke test (en la VM): `ssh azureuser@<IP> 'cd ombu && sg docker -c "./deploy/smoke-test.sh evidencias https://<FQDN>"'`. Modifica datos de demo: después, `./deploy/levantar.sh --vm --primera-vez`.

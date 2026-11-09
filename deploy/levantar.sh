@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
-# Levanta Cervecería Ombú en modo despliegue y la publica con Cloudflare Tunnel.
+# Levanta Cervecería Ombú en modo despliegue y la publica.
 #
-#   ./deploy/levantar.sh                 # arranques normales (conserva los datos)
+#   ./deploy/levantar.sh                 # modo túnel: laptop + Cloudflare Tunnel (plan B)
+#   ./deploy/levantar.sh --vm            # modo VM: Caddy con HTTPS automático en SITE_ADDRESS
 #   ./deploy/levantar.sh --primera-vez   # SOLO la primera vez: crea y carga OmbuDB (destructivo)
+#   (se combinan: ./deploy/levantar.sh --vm --primera-vez)
 #
 # Se puede ejecutar varias veces: si ya está todo arriba, solo vuelve a mostrar la URL.
 set -euo pipefail
@@ -17,14 +19,17 @@ LOG_TUNEL="$RUNTIME/cloudflared.log"
 TIMEOUT_SQL=240
 TIMEOUT_HEALTH=180
 TIMEOUT_TUNEL=60
+TIMEOUT_TLS=180
 
 PRIMERA_VEZ=false
 SIN_TUNEL=false
+MODO_VM=false
 for arg in "$@"; do
     case "$arg" in
         --primera-vez) PRIMERA_VEZ=true ;;
         --sin-tunel)   SIN_TUNEL=true ;;
-        *) echo "Opción desconocida: $arg (usar --primera-vez o --sin-tunel)"; exit 2 ;;
+        --vm)          MODO_VM=true ;;
+        *) echo "Opción desconocida: $arg (usar --vm, --primera-vez o --sin-tunel)"; exit 2 ;;
     esac
 done
 
@@ -46,7 +51,7 @@ ok "Docker y docker compose v2"
 
 CLOUDFLARED="$(command -v cloudflared || true)"
 [ -z "$CLOUDFLARED" ] && [ -x "$HOME/.local/bin/cloudflared" ] && CLOUDFLARED="$HOME/.local/bin/cloudflared"
-if [ "$SIN_TUNEL" = false ]; then
+if [ "$SIN_TUNEL" = false ] && [ "$MODO_VM" = false ]; then
     [ -n "$CLOUDFLARED" ] || error "No se encontró 'cloudflared'. Instalalo o usá --sin-tunel para probar solo en local."
     ok "cloudflared ($("$CLOUDFLARED" --version 2>&1 | head -1))"
 fi
@@ -60,6 +65,18 @@ ok "$ENV_FILE completo"
 
 PUERTO_LOCAL="${CADDY_HTTP_PORT##*:}"
 URL_LOCAL="http://127.0.0.1:${PUERTO_LOCAL}"
+
+if [ "$MODO_VM" = true ]; then
+    case "${SITE_ADDRESS:-}" in
+        ""|:*) error "Modo --vm: SITE_ADDRESS debe ser el dominio de la VM (ej. ombu-ae4.brazilsouth.cloudapp.azure.com), no '${SITE_ADDRESS:-}'." ;;
+    esac
+    [ -n "${ACME_EMAIL:-}" ] || error "Modo --vm: falta ACME_EMAIL en $ENV_FILE (lo usa Let's Encrypt para avisos del certificado)."
+    [ "${CADDY_HTTP_PORT:-}" = "80" ] && [ "${CADDY_HTTPS_PORT:-}" = "443" ] \
+        || error "Modo --vm: CADDY_HTTP_PORT=80 y CADDY_HTTPS_PORT=443 (públicos) son obligatorios para obtener el certificado."
+    # Caddy sólo atiende el dominio configurado, así que la salud se consulta directo a la API.
+    URL_LOCAL="http://127.0.0.1:${PORT##*:}"
+    ok "Modo VM: https://${SITE_ADDRESS}"
+fi
 
 # --------------------------------------------- 2. Archivos generados (no versionados)
 paso "Generando configuración del cliente y credenciales de acceso"
@@ -117,6 +134,29 @@ until curl -fsS "$URL_LOCAL/api/health" 2>/dev/null | grep '"ok":true' >/dev/nul
     sleep 3
 done
 ok "API sana (SQL Server, Redis y RabbitMQ OK) en $URL_LOCAL"
+
+if [ "$MODO_VM" = true ]; then
+    paso "Esperando el certificado HTTPS de Let's Encrypt (máx. ${TIMEOUT_TLS}s)"
+    inicio=$SECONDS
+    # --resolve apunta el dominio a esta máquina: valida certificado y proxy sin depender del DNS local.
+    until curl -fsS --resolve "${SITE_ADDRESS}:443:127.0.0.1" "https://${SITE_ADDRESS}/api/health" 2>/dev/null | grep '"ok":true' >/dev/null; do
+        if [ $((SECONDS - inicio)) -ge $TIMEOUT_TLS ]; then
+            docker logs ombu-caddy 2>&1 | grep -iE "error|challenge|certificate" | tail -5 || true
+            error "Caddy no obtuvo el certificado. Verificá que el DNS de ${SITE_ADDRESS} apunte a esta VM y que 80/443 estén abiertos en el NSG."
+        fi
+        sleep 5
+    done
+    echo "https://${SITE_ADDRESS}" > "$RUNTIME/url_publica.txt"
+    echo
+    echo "================================================================"
+    echo "  CERVECERÍA OMBÚ PUBLICADA (VM)"
+    echo "  URL:      https://${SITE_ADDRESS}"
+    echo "  Usuario:  $BASIC_AUTH_USER   (contraseña: BASIC_AUTH_PASSWORD en $ENV_FILE)"
+    echo "  Salud:    https://${SITE_ADDRESS}/api/health"
+    echo "  Apagar:   ./deploy/apagar.sh   (no borra datos)"
+    echo "================================================================"
+    exit 0
+fi
 
 if [ "$SIN_TUNEL" = true ]; then
     echo; echo "Listo en modo local: $URL_LOCAL  (usuario: $BASIC_AUTH_USER, contraseña en $ENV_FILE)"
