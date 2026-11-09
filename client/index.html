@@ -64,18 +64,35 @@
 
             <!-- Contenedor Central -->
             <div class="content-wrapper">
-                <!-- Contenedores de Alertas (ocultos inicialmente con display: none) -->
-                <div id="alerta-exito" class="alerta alerta-exito" role="alert"></div>
-                <div id="alerta-error" class="alerta alerta-error" role="alert"></div>
-
                 <!-- VISTA 1: GESTIÓN DE CANILLAS Y ALTA -->
                 <div id="vista-muro-gestion" class="vista-seccion">
+                    <!-- Sección Canillas Registradas -->
+                    <section class="section-canillas" aria-labelledby="titulo-canillas">
+                        <div class="section-header">
+                            <h2 id="titulo-canillas">Canillas Registradas</h2>
+                            <span id="contador-canillas" class="counter">Consultando servidor...</span>
+                        </div>
+
+                        <!-- Contenedor Ancla Dinámico (Arquitectura Desacoplada) -->
+                        <div id="muro-canillas" class="muro-canillas" aria-live="polite" aria-busy="true">
+                            <!-- Estado visual inicial de carga -->
+                            <div class="muro-loader" role="status">
+                                <div class="spinner-cervecero" aria-hidden="true"></div>
+                                <p class="loader-texto">Cargando registros del servidor...</p>
+                                <span class="loader-subtexto">Sincronizando tap wall en tiempo real</span>
+                            </div>
+                        </div>
+                    </section>
+
                     <!-- Panel Estilizado con Formulario de Alta -->
                     <section id="panel-alta" class="form-panel">
                         <div class="panel-header">
                             <h2><span>➕</span> Registrar Nueva Canilla</h2>
                             <p>Configure los parámetros del nuevo grifo para integrarlo al muro de autoservicio NFC.</p>
                         </div>
+
+                        <div id="alerta-exito" class="alerta alerta-exito" role="alert" hidden></div>
+                        <div id="alerta-error" class="alerta alerta-error" role="alert" hidden></div>
 
                         <form id="form-canilla" novalidate>
                             <div class="form-grid">
@@ -133,24 +150,6 @@
                                 </button>
                             </div>
                         </form>
-                    </section>
-
-                    <!-- Sección Canillas Registradas -->
-                    <section class="section-canillas" aria-labelledby="titulo-canillas">
-                        <div class="section-header">
-                            <h2 id="titulo-canillas">Canillas Registradas</h2>
-                            <span id="contador-canillas" class="counter">Consultando servidor...</span>
-                        </div>
-
-                        <!-- Contenedor Ancla Dinámico (Arquitectura Desacoplada) -->
-                        <div id="muro-canillas" class="muro-canillas" aria-live="polite" aria-busy="true">
-                            <!-- Estado visual inicial de carga -->
-                            <div class="muro-loader" role="status">
-                                <div class="spinner-cervecero" aria-hidden="true"></div>
-                                <p class="loader-texto">Cargando registros del servidor...</p>
-                                <span class="loader-subtexto">Sincronizando tap wall en tiempo real</span>
-                            </div>
-                        </div>
                     </section>
                 </div>
 
@@ -303,7 +302,7 @@
                 </div>
 
                 <!-- F-14: Modal de Ticket / Comprobante PDF usando elemento nativo <dialog> -->
-                <dialog id="ticket-modal" class="ticket-modal-card" aria-labelledby="ticket-modal-titulo" style="border: none; padding: 0; background: transparent;">
+                <dialog id="ticket-modal" class="ticket-modal-card" aria-labelledby="ticket-modal-titulo" aria-modal="true">
                     <div class="ticket-modal-content">
                         <div class="ticket-header">
                             <h3 id="ticket-modal-titulo"><span>✅</span> ¡Servido Exitoso!</h3>
@@ -312,34 +311,34 @@
                         <div class="ticket-body-table">
                             <div class="ticket-row">
                                 <span>Despacho N°:</span>
-                                <span id="modal-id-despacho">#0</span>
+                                <span id="modal-id-despacho"></span>
                             </div>
                             <div class="ticket-row">
                                 <span>Cliente:</span>
-                                <span id="modal-cliente">-</span>
+                                <span id="modal-cliente"></span>
                             </div>
                             <div class="ticket-row">
                                 <span>Cerveza:</span>
-                                <span id="modal-cerveza">-</span>
+                                <span id="modal-cerveza"></span>
                             </div>
                             <div class="ticket-row">
                                 <span>Formato / Volumen:</span>
-                                <span id="modal-formato">-</span>
+                                <span id="modal-formato"></span>
                             </div>
                             <div class="ticket-row">
                                 <span>Importe Cobrado:</span>
-                                <span id="modal-importe" style="color: var(--primary);">$0,00</span>
+                                <span id="modal-importe" style="color: var(--primary);"></span>
                             </div>
                             <div class="ticket-row">
                                 <span>Nuevo Saldo en Tarjeta:</span>
-                                <span id="modal-saldo-restante" style="color: var(--color-success);">$0,00</span>
+                                <span id="modal-saldo-restante" style="color: var(--color-success);"></span>
                             </div>
                         </div>
                         <div class="ticket-actions">
                             <button type="button" id="btn-descargar-pdf" class="btn-descargar-pdf">
                                 <span>📄</span> Descargar Comprobante PDF
                             </button>
-                            <button type="button" id="btn-cerrar-modal" class="btn-cerrar-modal">
+                            <button type="button" id="btn-cerrar-modal" class="btn-cerrar-modal" autofocus>
                                 Nuevo Servido
                             </button>
                         </div>
@@ -361,10 +360,18 @@
 
         // Función para ocultar y limpiar alertas del formulario
         function ocultarAlertas() {
-            alertaExito.style.display = 'none';
-            alertaError.style.display = 'none';
+            alertaExito.hidden = true;
+            alertaError.hidden = true;
             alertaExito.textContent = '';
             alertaError.textContent = '';
+        }
+
+        function mostrarAlerta(alerta, mensaje, mensajeAlternativo) {
+            ocultarAlertas();
+            alerta.textContent = typeof mensaje === 'string' && mensaje.trim()
+                ? mensaje.trim()
+                : mensajeAlternativo;
+            alerta.hidden = false;
         }
 
         /**
@@ -519,41 +526,35 @@
                 estado: estadoVal
             };
 
+            const headers = { 'Content-Type': 'application/json' };
+            const adminToken = window.OMBU_CONFIG?.ADMIN_TOKEN;
+            if (adminToken) headers.Authorization = 'Bearer ' + adminToken;
+
             try {
                 const response = await fetch(API_URL, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
+                    headers,
                     body: JSON.stringify(datos)
                 });
 
                 if (response.status === 201) {
                     // 201 Created: mostrar mensaje de éxito en verde, resetear formulario y actualizar lista
                     const data = await response.json().catch(() => ({ message: 'Canilla creada exitosamente' }));
-                    alertaExito.textContent = data.message || 'Canilla creada exitosamente';
-                    alertaExito.style.display = 'block';
-                    alertaError.style.display = 'none';
+                    mostrarAlerta(alertaExito, data?.message, 'Canilla creada exitosamente');
                     formCanilla.reset();
                     await cargarCanillas();
                 } else if (response.status === 400) {
                     // 400 Bad Request: mostrar alerta roja con el mensaje exacto retornado por el backend
                     const data = await response.json().catch(() => ({ error: 'Faltan campos obligatorios' }));
-                    alertaError.textContent = data.error || data.message || 'Error en los datos enviados';
-                    alertaError.style.display = 'block';
-                    alertaExito.style.display = 'none';
+                    mostrarAlerta(alertaError, data?.error || data?.message, 'Error en los datos enviados');
                 } else {
                     // Otros códigos de error
                     const data = await response.json().catch(() => ({ error: `Error del servidor (${response.status})` }));
-                    alertaError.textContent = data.error || data.message || `Error del servidor (${response.status})`;
-                    alertaError.style.display = 'block';
-                    alertaExito.style.display = 'none';
+                    mostrarAlerta(alertaError, data?.error || data?.message, 'Error del servidor (' + response.status + ')');
                 }
             } catch (error) {
                 console.error('Error en fetch POST:', error);
-                alertaError.textContent = 'Error de conexión con el servidor: ' + error.message;
-                alertaError.style.display = 'block';
-                alertaExito.style.display = 'none';
+                mostrarAlerta(alertaError, 'Error de conexión con el servidor: ' + error.message);
             }
         });
 
@@ -568,6 +569,8 @@
         const breadcrumbActive = document.getElementById('breadcrumb-active');
 
         function activarVista(vista) {
+            ocultarAlertas();
+
             // Ocultar todas
             vistaMuro.classList.add('oculta');
             vistaNfc.classList.add('oculta');
@@ -583,9 +586,7 @@
                 vistaNfc.classList.remove('oculta');
                 navNfc?.classList.add('active');
                 if (breadcrumbActive) breadcrumbActive.textContent = 'Terminal Autoservicio NFC';
-                if (window.terminalNfc && typeof window.terminalNfc.cargarDatosDesdeServidor === 'function') {
-                    window.terminalNfc.cargarDatosDesdeServidor();
-                }
+                window.terminalNfc?.activarVista();
             } else if (vista === 'stock') {
                 if(vistaStock) vistaStock.classList.remove('oculta');
                 navStock?.classList.add('active');
@@ -600,7 +601,11 @@
             }
         }
 
-        navMuro?.addEventListener('click', (e) => { e.preventDefault(); activarVista('muro'); });
+        navMuro?.addEventListener('click', (e) => {
+            e.preventDefault();
+            activarVista('muro');
+            window.scrollTo(0, 0);
+        });
         navAlta?.addEventListener('click', () => { activarVista('muro'); });
         navNfc?.addEventListener('click', (e) => { e.preventDefault(); activarVista('nfc'); });
         navStock?.addEventListener('click', (e) => { e.preventDefault(); activarVista('stock'); });
