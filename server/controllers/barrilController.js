@@ -1,4 +1,18 @@
 const { sql, getConnection } = require('../config/db');
+const { getRedisClient } = require('../config/redis');
+
+/**
+ * Invalida la caché del resumen de stock (stockController, TTL 60 s) después de un commit,
+ * para que el panel no muestre el estado anterior. Si Redis no responde, la caché
+ * expira sola por TTL: el error se registra pero no hace fallar la operación ya confirmada.
+ */
+const invalidarCacheStock = async () => {
+    try {
+        await getRedisClient().del('stock:muro:resumen');
+    } catch (error) {
+        console.warn("No se pudo invalidar la caché de stock:", error.message);
+    }
+};
 
 /**
  * Obtiene todos los barriles que no estén en estado 'Retirado'.
@@ -56,6 +70,8 @@ const retirarBarril = async (req, res) => {
                     fecha_desconexion = GETDATE()
                 WHERE id_barril = @id
             `);
+
+        await invalidarCacheStock();
 
         res.status(204).send(); // Status 204 significa "Operación exitosa, sin contenido extra para devolver"
     } catch (error) {
@@ -128,6 +144,8 @@ const conectarBarril = async (req, res) => {
 
         // 5. Todo salió perfecto, confirmamos los cambios de forma permanente
         await transaction.commit();
+
+        await invalidarCacheStock();
 
         res.status(200).json({ message: "Barril conectado exitosamente." });
     } catch (error) {
