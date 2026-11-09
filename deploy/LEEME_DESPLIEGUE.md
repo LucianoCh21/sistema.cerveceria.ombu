@@ -39,6 +39,19 @@ Al final, el script imprime un recuadro `CERVECERÍA OMBÚ PUBLICADA` con la **U
 - **La URL cambia cada vez que se reinicia el túnel.** Pasale al profesor la que esté activa.
 - Para apagar: `./deploy/apagar.sh`. Apaga el túnel y los contenedores **sin borrar los datos**.
 
+## Volver la demo al estado inicial (sin borrar nada)
+
+Después de ensayar, las tarjetas se quedan sin saldo y los barriles bajan. Con el stack levantado:
+
+```bash
+./deploy/reset-demo.sh        # pide confirmación (s)
+./deploy/reset-demo.sh -y     # sin preguntar
+```
+
+- Vuelve a la semilla: saldos (`A1B2C3D4E5` = $6500, `F6G7H8I9J0` = $5000), barriles 1–7 en las canillas 1–7 con 50 L (el 1 con 49,5 L), canillas 1–7 `Activa` y 8–10 `Inactiva`. También limpia la caché del muro y las sesiones NFC.
+- **No** borra el historial de despachos ni la base, y **no** usa `--primera-vez`. Se puede correr las veces que haga falta y no hace falta reiniciar el túnel (la URL no cambia).
+- Con esos saldos alcanzan **5 Medias Pintas**: 3 con la primera tarjeta y 2 con la segunda. Si todas son Cruz Diablo ($2200), la primera tarjeta llega solo a 2.
+
 ---
 
 ## ¿Cómo sé que funciona?
