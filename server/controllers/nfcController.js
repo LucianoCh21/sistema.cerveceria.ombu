@@ -11,7 +11,8 @@ const autenticarTarjeta = async (req, res) => {
         const resultado = await nfcService.autenticarTarjeta(idTarjeta, id_canilla);
         return res.status(200).json(resultado);
     } catch (error) {
-        if (error.status && error.status < 500) {
+        // 503 SESSION_UNAVAILABLE (Redis no disponible) se informa tal cual al cliente.
+        if (error.status && (error.status < 500 || error.status === 503)) {
             return res.status(error.status).json({
                 ok: false,
                 error: error.message,

@@ -19,7 +19,10 @@ const getRedisClient = () => {
                 return delay;
             },
             lazyConnect: true,
-            maxRetriesPerRequest: 3
+            maxRetriesPerRequest: 3,
+            // Timeout por comando: con Redis caído cada reintento esperaba la resolución DNS
+            // y una petición tardaba 15–40 s. Con 1,5 s el respaldo (SQL o 503) responde enseguida.
+            commandTimeout: 1500
         });
 
         redisClient.on('connect', () => {
