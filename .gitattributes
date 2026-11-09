@@ -1,0 +1,4 @@
+# Scripts y configs del despliegue con fin de línea LF aunque se clone en Windows
+*.sh text eol=lf
+deploy/Caddyfile text eol=lf
+*.yml text eol=lf

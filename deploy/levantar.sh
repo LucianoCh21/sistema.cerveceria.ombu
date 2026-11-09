@@ -57,6 +57,10 @@ if [ "$SIN_TUNEL" = false ] && [ "$MODO_VM" = false ]; then
 fi
 
 [ -f "$ENV_FILE" ] || error "Falta $ENV_FILE. Pedíselo a tu compañero/a (se pasa en privado) o copiá deploy/.env.deploy.example y completalo."
+# Un .env guardado en Windows (CRLF) agrega "\r" a cada valor y rompe contraseñas y tokens.
+if grep -q $'\r' "$ENV_FILE"; then
+    error "$ENV_FILE tiene fin de línea de Windows (CRLF). Corregilo con: sed -i 's/\r\$//' $ENV_FILE"
+fi
 set -a; . "./$ENV_FILE"; set +a
 for v in DB_PASSWORD RABBITMQ_USER RABBITMQ_PASS ADMIN_TOKEN TERMINAL_TOKEN BASIC_AUTH_USER BASIC_AUTH_PASSWORD; do
     [ -n "${!v:-}" ] || error "La variable $v está vacía en $ENV_FILE."
