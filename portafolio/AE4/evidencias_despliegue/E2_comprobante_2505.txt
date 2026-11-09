@@ -1,0 +1,20 @@
+CERVECERÍA OMBÚ
+Tap Wall Autoservicio NFC
+----------------------------------------------------
+
+COMPROBANTE N°: #2505
+Fecha: 9/11/2026, 08:27:48
+Cliente: Juan Pérez
+Tarjeta NFC: ******D4E5
+----------------------------------------------------
+
+DETALLE DEL SERVIDO:
+Canilla N°: 1 — Cerveza: Caravana IPA
+Formato: Media Pinta (250 ml)
+Volumen servido: 0.250 L
+
+IMPORTE COBRADO: $1950.00
+¡Gracias por disfrutar en Cervecería Ombú!
+Consumo responsable. Prohibida su venta a menores de 18 años.
+
+

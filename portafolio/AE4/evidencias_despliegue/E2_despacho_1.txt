@@ -1,0 +1,2 @@
+{"ok":true,"id_despacho":"2505","id_canilla":1,"id_barril":1,"cerveza":"Caravana IPA","cliente":"Juan Pérez","cliente_nombre":"Juan Pérez","id_formato":1,"formato":"Media Pinta","volumen_litros":0.25,"mililitros_servidos":250,"importe":1950,"importe_cobrado":1950,"importe_debitado":1950,"precio_cobrado":1950,"saldo_restante":48050,"comprobante_url":"/api/despachos/2505/comprobante","evento_outbox_registrado":true,"fecha_hora":"2026-11-09T20:27:48.243Z"}
+HTTP 201

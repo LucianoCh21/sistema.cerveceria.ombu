@@ -1,0 +1,83 @@
+Fecha (reloj de la máquina): 2026-11-09T17:27:39-03:00
+URL pública: https://ordinance-bibliographic-aircraft-trademark.trycloudflare.com
+
+== E1 Muro público
+GET / sin credenciales -> 401 (esperado 401 basic_auth)
+GET / con credenciales -> HTTP/2 200 
+   referrer-policy: no-referrer
+   x-content-type-options: nosniff
+   x-frame-options: DENY
+GET /api/canillas -> HTTP/2 200 , canillas: 10
+config.js servido: API_BASE relativo=1, contiene tokens por defecto del repo=0
+GET /api/nfc/tarjetas (token terminal, DEMO_MODE) -> ok=true tarjetas=2
+Puertos publicados en el host: 127.0.0.1:13000-> 127.0.0.1:14330-> 127.0.0.1:15680-> 127.0.0.1:15690-> 127.0.0.1:16380-> 127.0.0.1:18080-> 127.0.0.1:8088-> 127.0.0.1:8443-> 
+GET /api/health -> {"ok":true,"servicios":{"sqlserver":"ok","redis":"ok","rabbitmq":"ok"}}
+
+== E2 Terminal NFC: tap -> formatos -> despacho (idempotente) -> PDF
+autenticar -> ok=true ttl=45
+TTL en Redis: 45 s
+formatos -> [{"id":1,"nombre":"Media Pinta","precio":1950},{"id":2,"nombre":"Pinta","precio":3500},{"id":3,"nombre":"Litro","precio":6500}]
+despacho #1 -> HTTP 201 id=2505
+despacho #2 misma clave -> HTTP 200 idempotencia_aplicada=true id=2505
+filas en Despacho con ese id: 1
+comprobante -> %PDF-, tarjeta: Tarjeta NFC: ******D4E5, menciona saldo: 0
+
+== E3 Asíncrono: outbox -> RabbitMQ -> worker
+   🍺 [stockConsumer] Evento recibido: Despacho #2505 | Barril #1
+procesado por stock (idempotencia worker): 1
+
+== E4 Panel admin: caché + conectar barril
+resumen 1 -> sql-server, resumen 2 -> redis-cache, TTL caché: 59 s
+conectar barril 9 (no existe) -> {"error":"Barril no encontrado o se encuentra 'Retirado'."} HTTP 404
+conectar barril 2 en canilla 1 (ocupada) -> {"error":"La canilla ya tiene un barril conectado."} HTTP 400
+resumen con token de terminal (sin rol admin) -> HTTP 403
+-- invalidación de caché (fix 12cb92f): retirar barril 7
+clave en caché antes: 1
+DELETE /api/barriles/7 -> HTTP 204
+clave en caché después: 0
+siguiente resumen -> sql-server canilla7_barril=null
+
+== Padlet 1 en vivo (fix 4fd5dd8)
+misma clave en paralelo #1 -> ok id=2506 HTTP 201
+misma clave en paralelo #2 -> ok id=2506 HTTP 200
+un tap, dos claves #1 -> SESSION_ALREADY_USED HTTP 403
+un tap, dos claves #2 -> ok id=2507 HTTP 201
+
+== E5a Resiliencia: RabbitMQ caído
+docker stop ombu-rabbitmq
+despacho con RabbitMQ caído -> HTTP 201
+eventos pendientes en outbox: 3
+health: {"ok":false,"servicios":{"sqlserver":"ok","redis":"ok","rabbitmq":"caido"}}
+docker start ombu-rabbitmq
+eventos pendientes tras ~9 s: 0
+worker (últimas líneas):
+   [stockConsumer] Error al inicializar consumidor RabbitMQ: getaddrinfo EAI_AGAIN rabbitmq
+   [stockConsumer] Conectando a RabbitMQ en amqp://ombu:***@rabbitmq:5672...
+   [stockConsumer] Error al inicializar consumidor RabbitMQ: connect ECONNREFUSED 172.18.0.3:5672
+   [stockConsumer] Conectando a RabbitMQ en amqp://ombu:***@rabbitmq:5672...
+   [*] [stockConsumer] Escuchando eventos en stock.despachos.queue (DLQ: stock.despachos.dlq via ombu.dlx)
+   🍺 [stockConsumer] Evento recibido: Despacho #2506 | Barril #2
+   🍺 [stockConsumer] Evento recibido: Despacho #2507 | Barril #2
+   🍺 [stockConsumer] Evento recibido: Despacho #2508 | Barril #3
+
+== E5b Resiliencia: Redis caído
+docker stop ombu-redis
+resumen stock -> origen=sql-server (3.226574 s)
+tap NFC -> SESSION_UNAVAILABLE HTTP 503 (1.719623 s)
+docker start ombu-redis
+health tras reinicio: {"ok":true,"servicios":{"sqlserver":"ok","redis":"ok","rabbitmq":"ok"}}
+
+== Verificación A (Padlet 2, fix 669c3f4): exclusión mutua con UPDLOCK
+otra sesión SQL retiene el barril de la canilla 4 durante 8 s; el despacho esperó y respondió HTTP 201 en 6.149174 s
+Fecha (reloj de la máquina): 2026-11-09T17:29:23-03:00
+URL pública: https://ordinance-bibliographic-aircraft-trademark.trycloudflare.com
+
+== E3 (reconsulta): eventos del outbox publicados
+7 publicados de 7
+Ultimo evento: id=7 tipo=DespachoRealizado publicado_en=2026-11-09T20:28:44.2091897
+
+== Verificación B (Padlet 2): sin sobreventa con dos despachos simultáneos
+barril 5 (canilla 5) con 0.40 L: alcanza para una Media Pinta (0.25 L), no para dos
+tarjeta A1B2C3D4E5 -> ok id=2512 HTTP 201
+tarjeta F6G7H8I9J0 -> INSUFFICIENT_STOCK HTTP 409
+litros_restantes del barril 5 tras la carrera: .15 (esperado 0.15). Sin el fix ambos pasaban el chequeo de stock (deducido del código, no ejecutado)

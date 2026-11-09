@@ -1,0 +1,8 @@
+[stockConsumer] Error al inicializar consumidor RabbitMQ: getaddrinfo EAI_AGAIN rabbitmq
+[stockConsumer] Conectando a RabbitMQ en amqp://ombu:***@rabbitmq:5672...
+[stockConsumer] Error al inicializar consumidor RabbitMQ: connect ECONNREFUSED 172.18.0.3:5672
+[stockConsumer] Conectando a RabbitMQ en amqp://ombu:***@rabbitmq:5672...
+[*] [stockConsumer] Escuchando eventos en stock.despachos.queue (DLQ: stock.despachos.dlq via ombu.dlx)
+🍺 [stockConsumer] Evento recibido: Despacho #2506 | Barril #2
+🍺 [stockConsumer] Evento recibido: Despacho #2507 | Barril #2
+🍺 [stockConsumer] Evento recibido: Despacho #2508 | Barril #3

@@ -1,0 +1,1 @@
+{"error":"Barril no encontrado o se encuentra 'Retirado'."} HTTP 404

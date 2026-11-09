@@ -1,0 +1,1 @@
+{"error":"La canilla ya tiene un barril conectado."} HTTP 400

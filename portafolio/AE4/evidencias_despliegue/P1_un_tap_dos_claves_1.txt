@@ -1,0 +1,1 @@
+{"ok":false,"error":"La sesión del grifo ya fue utilizada o expiró. Volvé a apoyar la tarjeta.","codigo":"SESSION_ALREADY_USED"} HTTP 403

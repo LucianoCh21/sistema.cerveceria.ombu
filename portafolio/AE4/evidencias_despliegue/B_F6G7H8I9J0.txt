@@ -1,0 +1,1 @@
+{"ok":false,"error":"Stock insuficiente en el barril conectado para servir el volumen solicitado.","codigo":"INSUFFICIENT_STOCK"} HTTP 409

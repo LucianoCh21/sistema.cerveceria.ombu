@@ -1,0 +1,17 @@
+HTTP/2 200 
+date: Mon, 09 Nov 2026 20:27:45 GMT
+content-type: application/json; charset=utf-8
+cf-ray: a57f8f5639257302-EZE
+cf-cache-status: DYNAMIC
+x-powered-by: Express
+etag: W/"be4-3wQ/BIR4dkkSzQajfzuhvrsVZEo"
+server: cloudflare
+vary: Origin, Accept-Encoding
+via: 1.1 Caddy
+x-robots-tag: none
+x-robots-tag: none
+access-control-allow-credentials: true
+referrer-policy: no-referrer
+x-content-type-options: nosniff
+x-frame-options: DENY
+
