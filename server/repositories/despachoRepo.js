@@ -6,13 +6,16 @@ const { getConnection, sql } = require('../config/db');
 class DespachoRepository {
     async getBarrilActivoPorCanilla(transaction, idCanilla) {
         const request = new sql.Request(transaction);
+        // Padlet 2: UPDLOCK retiene la fila del barril hasta el commit, así un segundo
+        // despacho concurrente espera y relee litros_restantes ya descontados (sin sobreventa).
+        // fecha_desconexion IS NULL coincide con el filtro de UQ_Barril_Canilla_Conectado.
         const result = await request
             .input('id_canilla', sql.Int, Number(idCanilla))
             .query(`
                 SELECT b.id_barril, b.id_cerveza, b.litros_restantes, b.estado, ce.nombre AS nombre_cerveza
-                FROM Barril b
+                FROM Barril b WITH (UPDLOCK, ROWLOCK)
                 JOIN Cerveza ce ON b.id_cerveza = ce.id_cerveza
-                WHERE b.id_canilla = @id_canilla AND b.estado = 'Conectado'
+                WHERE b.id_canilla = @id_canilla AND b.estado = 'Conectado' AND b.fecha_desconexion IS NULL
             `);
         return result.recordset[0] || null;
     }
