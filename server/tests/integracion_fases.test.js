@@ -50,7 +50,15 @@ test('Fase 5 (F-18) - Pruebas de Integración y Reglas de Negocio Despachos/NFC'
         );
     });
 
-    await t.test('F-03: Debe rechazar si la tarjeta no tiene sesión activa en Redis', async () => {
+    await t.test('F-03: Debe rechazar si la tarjeta no tiene sesión activa en Redis', async (st) => {
+        // Integración real con Redis: desde Padlet 1 la reserva de idempotencia falla cerrada (503)
+        // si Redis no responde, así que sin infraestructura este caso no se puede evaluar.
+        try {
+            await getRedisClient().ping();
+        } catch (_) {
+            st.skip('Redis no disponible — ejecutar con la infraestructura levantada');
+            return;
+        }
         await assert.rejects(
             async () => {
                 await despachoService.procesarDespacho({

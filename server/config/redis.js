@@ -123,6 +123,57 @@ const getIdempotencyResult = async (idempotencyKey) => {
     }
 };
 
+const IDEMPOTENCIA_EN_PROCESO = 'en_proceso';
+
+const getReadyClient = async () => {
+    const client = getRedisClient();
+    if (client.status !== 'ready' && client.status !== 'connecting') {
+        await client.connect().catch(() => {});
+    }
+    return client;
+};
+
+/**
+ * Padlet 1: reserva atómica de la Idempotency-Key (SET NX EX). Sólo una solicitud
+ * puede pasar de "no existe" a "en_proceso"; las demás ven la marca o el resultado previo.
+ * A diferencia de las funciones anteriores, NO traga errores: si Redis falla, el cobro
+ * no debe continuar sin control de duplicados (falla cerrada).
+ * @returns {Promise<{reservada: boolean, enProceso?: boolean, resultado?: object}>}
+ */
+const reservarIdempotencia = async (idempotencyKey, ttlSeconds = 30) => {
+    const client = await getReadyClient();
+    const key = `idempotency:${idempotencyKey}`;
+    const reservada = await client.set(key, IDEMPOTENCIA_EN_PROCESO, 'EX', ttlSeconds, 'NX');
+    if (reservada === 'OK') return { reservada: true };
+
+    const actual = await client.get(key);
+    if (actual === null || actual === IDEMPOTENCIA_EN_PROCESO) return { reservada: false, enProceso: true };
+    return { reservada: false, resultado: JSON.parse(actual) };
+};
+
+/**
+ * Libera la reserva cuando la operación falló antes del commit, para permitir reintentar
+ * con la misma clave. Si Redis no responde, la reserva vence sola por TTL.
+ */
+const liberarIdempotencia = async (idempotencyKey) => {
+    try {
+        const client = await getReadyClient();
+        await client.del(`idempotency:${idempotencyKey}`);
+    } catch (error) {
+        console.error(`[Redis] Error liberando idempotencia para ${idempotencyKey}:`, error.message);
+    }
+};
+
+/**
+ * Padlet 1: consume la sesión NFC de forma atómica (GETDEL). Dos despachos con la misma
+ * sesión no pueden obtenerla ambos. Propaga errores de Redis (falla cerrada).
+ */
+const consumirNfcSession = async (uid) => {
+    const client = await getReadyClient();
+    const data = await client.getdel(`nfc:sesion:${uid}`);
+    return data ? JSON.parse(data) : null;
+};
+
 module.exports = {
     getRedisClient,
     get redisClient() { return getRedisClient(); },
@@ -131,5 +182,8 @@ module.exports = {
     getNfcSession,
     deleteNfcSession,
     setIdempotencyResult,
-    getIdempotencyResult
+    getIdempotencyResult,
+    reservarIdempotencia,
+    liberarIdempotencia,
+    consumirNfcSession
 };

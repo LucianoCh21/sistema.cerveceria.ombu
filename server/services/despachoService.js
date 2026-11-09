@@ -1,5 +1,5 @@
 const { getConnection, sql } = require('../config/db');
-const { getNfcSession, deleteNfcSession, setIdempotencyResult, getIdempotencyResult } = require('../config/redis');
+const { getNfcSession, setIdempotencyResult, reservarIdempotencia, liberarIdempotencia, consumirNfcSession } = require('../config/redis');
 const tarjetaRepo = require('../repositories/tarjetaRepo');
 const despachoRepo = require('../repositories/despachoRepo');
 
@@ -30,16 +30,48 @@ class DespachoService {
             throw err;
         }
 
-        // 1. Verificación de Idempotencia previa
-        const operacionPrevia = await getIdempotencyResult(idempotencyKey);
-        if (operacionPrevia) {
+        // 1. Reserva atómica de la Idempotency-Key (Padlet 1): SET NX EX 30.
+        // Antes era GET ... SET al final, y dos solicitudes simultáneas podían cobrar ambas.
+        let reserva;
+        try {
+            reserva = await reservarIdempotencia(idempotencyKey, 30);
+        } catch (redisErr) {
+            const err = new Error("No pudimos verificar la operación en este momento. Intentá de nuevo en unos segundos.");
+            err.codigo = "IDEMPOTENCY_UNAVAILABLE";
+            err.status = 503;
+            throw err;
+        }
+
+        if (reserva.resultado) {
             console.log(`[Idempotencia] Solicitud repetida detectada (${idempotencyKey}). Retornando respuesta previa.`);
             return {
-                ...operacionPrevia,
+                ...reserva.resultado,
                 idempotencia_aplicada: true
             };
         }
 
+        if (reserva.enProceso) {
+            const err = new Error("Este servido ya se está procesando. Esperá la confirmación.");
+            err.codigo = "IDEMPOTENCY_IN_PROGRESS";
+            err.status = 409;
+            throw err;
+        }
+
+        let confirmado = false;
+        try {
+            return await this.cobrarConSesion({ idempotencyKey, idTarjeta, idCanilla, formatoId, alConfirmar: () => { confirmado = true; } });
+        } catch (err) {
+            // Si no llegó al commit no hubo cobro: se libera la clave para permitir reintentar.
+            if (!confirmado) await liberarIdempotencia(idempotencyKey);
+            throw err;
+        }
+    }
+
+    /**
+     * Valida y consume la sesión NFC y ejecuta la transacción de cobro.
+     * Sólo se invoca con la Idempotency-Key ya reservada por procesarDespacho.
+     */
+    async cobrarConSesion({ idempotencyKey, idTarjeta, idCanilla, formatoId, alConfirmar }) {
         // 2. Validación de Sesión Efímera en Redis (Control de TTL 45s y Canilla)
         const sesion = await getNfcSession(idTarjeta);
         if (!sesion) {
@@ -52,6 +84,24 @@ class DespachoService {
         if (Number(sesion.id_canilla) !== Number(idCanilla)) {
             const err = new Error("La tarjeta fue habilitada en otra canilla. Volvé a apoyarla en esta.");
             err.codigo = "SESSION_TAP_MISMATCH";
+            err.status = 403;
+            throw err;
+        }
+
+        // 2b. Consumo atómico de la sesión (Padlet 1): GETDEL. Un tap habilita UN solo servido,
+        // aunque lleguen dos solicitudes con claves distintas dentro de los 45 s.
+        let sesionConsumida;
+        try {
+            sesionConsumida = await consumirNfcSession(idTarjeta);
+        } catch (redisErr) {
+            const err = new Error("No pudimos habilitar el grifo en este momento. Intentá de nuevo en unos segundos.");
+            err.codigo = "SESSION_UNAVAILABLE";
+            err.status = 503;
+            throw err;
+        }
+        if (!sesionConsumida) {
+            const err = new Error("La sesión del grifo ya fue utilizada o expiró. Volvé a apoyar la tarjeta.");
+            err.codigo = "SESSION_ALREADY_USED";
             err.status = 403;
             throw err;
         }
@@ -140,11 +190,9 @@ class DespachoService {
 
             await despachoRepo.insertarOutbox(transaction, 'DespachoRealizado', eventoPayload);
 
-            // 9. Confirmar transacción
+            // 9. Confirmar transacción (la sesión ya se consumió con GETDEL en el paso 3)
             await transaction.commit();
-
-            // 10. Eliminar sesión efímera en Redis
-            await deleteNfcSession(idTarjeta);
+            alConfirmar();
 
             // 11. Armar respuesta
             const clienteNombre = sesion?.cliente_nombre || (tarjetaActualizada.id_cliente ? 'Cliente Ombú' : 'Consumidor Final');

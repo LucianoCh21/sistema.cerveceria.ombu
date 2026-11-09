@@ -21,7 +21,8 @@ const crearDespacho = async (req, res) => {
         return res.status(status).json(respuesta);
 
     } catch (error) {
-        if (error.status && error.status < 500) {
+        // 503: Redis no disponible; se informa al cliente en lugar de un 500 genérico (falla cerrada).
+        if (error.status && (error.status < 500 || error.status === 503)) {
             return res.status(error.status).json({
                 ok: false,
                 error: error.message,
