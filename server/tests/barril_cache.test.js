@@ -55,8 +55,8 @@ test.beforeEach(() => {
 });
 
 test('conectar barril: invalida stock:muro:resumen después del commit', async () => {
-    // Arrange: canilla libre y UPDATE que afecta 1 fila
-    estado.resultados = [{ recordset: [] }, { rowsAffected: [1] }];
+    // Arrange: canilla libre, barril sin canilla (no 'Conectado' ni 'Agotado') y UPDATE que afecta 1 fila
+    estado.resultados = [{ recordset: [] }, { recordset: [{ estado: 'Retirado', id_canilla: null }] }, { rowsAffected: [1] }];
     const req = { body: { id_barril: 2, id_canilla: 8, id_empleado_conexion: 1 } };
     const res = fakeRes();
     // Act

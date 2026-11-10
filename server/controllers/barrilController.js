@@ -122,6 +122,27 @@ const conectarBarril = async (req, res) => {
             return res.status(400).json({ error: "La canilla ya tiene un barril conectado." });
         }
 
+        // 3b. Validamos el estado del barril (bloqueado en la misma transacción): un barril
+        // conectado en otra canilla no se mueve en silencio y uno agotado no se reconecta.
+        const barrilCheck = await transaction.request()
+            .input('id_barril', sql.Int, id_barril)
+            .query(`
+                SELECT estado, id_canilla
+                FROM Barril WITH (UPDLOCK, HOLDLOCK)
+                WHERE id_barril = @id_barril
+            `);
+        const barril = barrilCheck.recordset[0];
+        if (barril && barril.estado === 'Conectado') {
+            await transaction.rollback();
+            return res.status(409).json({
+                error: `El barril ${id_barril} ya está conectado en la canilla ${barril.id_canilla}. Retiralo de esa canilla antes de conectarlo en otra.`
+            });
+        }
+        if (barril && barril.estado === 'Agotado') {
+            await transaction.rollback();
+            return res.status(409).json({ error: `El barril ${id_barril} está agotado y no se puede volver a conectar.` });
+        }
+
         // 4. Si la canilla está libre, procedemos a hacer el UPDATE con los datos del empleado
         const result = await transaction.request()
             .input('id_barril', sql.Int, id_barril)
