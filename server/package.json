@@ -8,6 +8,7 @@
     "query": "node query.js",
     "init-db": "node init-db.js",
     "test": "node --test --experimental-test-coverage tests/",
+    "test:unit": "node run-unit-tests.js",
     "lint": "eslint ."
   },
   "repository": {

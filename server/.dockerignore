@@ -1,5 +1,8 @@
 node_modules
 npm-debug.log
-.env
+**/.env
+**/.env.*
+**/.npmrc
+**/.auditoria-privada
 .git
 .gitignore

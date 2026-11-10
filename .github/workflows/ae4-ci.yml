@@ -1,0 +1,59 @@
+name: AE4 CI
+
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+      - feature/iso25010-luciano
+  push:
+    branches:
+      - main
+      - develop
+      - feature/iso25010-luciano
+      - feature/ae4-ci-luciano
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Unit tests and backend image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+          package-manager-cache: false
+
+      - name: Install locked dependencies
+        working-directory: server
+        run: npm ci --no-audit --no-fund
+
+      - name: Run isolated unit tests
+        id: unit
+        working-directory: server
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run test:unit 2>&1 | tee "${RUNNER_TEMP}/ombu-unit-tests.log"
+
+      - name: Build backend image
+        run: docker build --file server/Dockerfile --tag ombu-api:ci server
+
+      - name: Save unit test log
+        if: ${{ !cancelled() && steps.unit.outcome != 'skipped' }}
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: ae4-unit-tests
+          path: ${{ runner.temp }}/ombu-unit-tests.log
+          if-no-files-found: warn
+          retention-days: 14

@@ -74,6 +74,10 @@ Pruebas automatizadas que no necesitan infraestructura (aisladas, sin base ni re
 cd server && node --test --test-force-exit $(ls tests/*.test.js | grep -v -e ae3_carga -e ae3_estres)
 ```
 
+## Verificación local y CI (AE4 B01)
+
+Desde `server/`, ejecutar `npm ci --no-audit --no-fund` y `npm run test:unit` con Node.js 24 LTS. Esta selección usa dobles y fixtures en memoria. El workflow **AE4 CI** ejecuta las mismas pruebas y construye la imagen del backend en el runner sin publicarla. [Informe de implementación y verificación B01](portafolio/AE4/AE4_B01_CI_PIPELINE_REPORT.md).
+
 ## Mejoras diagnosticadas
 
 Problemas detectados y **no** corregidos en esta entrega, presentados como *observación → diagnóstico → plan*. Las correcciones ya aplicadas en AE4 son: UPDLOCK en la lectura de stock (Padlet 2), idempotencia atómica `SET NX` + `GETDEL` de la sesión (Padlet 1), invalidación de caché al conectar/retirar barriles y comprobante sin UID completo ni saldo (Padlet 3).
@@ -90,5 +94,5 @@ Problemas detectados y **no** corregidos en esta entrega, presentados como *obse
 | 8 | Tokens fijos por rol, sin JWT | Credenciales compartidas y sin expiración | Login con JWT firmado (expiración, rol, sujeto) |
 | 9 | La "latencia media" de las pruebas de estrés baja al subir la carga | Se calcula como tiempo total ÷ N (inverso del throughput); no hay p95 | Medir la latencia por request (autocannon/k6) con media y p95 sobre el flujo de despacho |
 | 10 | Parte de las pruebas no ejercita código real y no hay E2E | `dia4`/`dia6` validan objetos locales; la pirámide queda sin el 10 % E2E | Reemplazarlas por pruebas con dobles sobre los servicios y sumar E2E del recorrido NFC → despacho → PDF |
-| 11 | Sin pipeline CI/CD, registry ni alta disponibilidad | Entrega y despliegue manuales; una sola réplica | GitHub Actions → GHCR → despliegue; dos réplicas de la API detrás de Caddy con healthchecks |
+| 11 | CI B01 definido; registry, CD y alta disponibilidad pendientes | Pruebas y build sin publicación en GitHub Actions; primera corrida remota por verificar. Despliegue manual con una sola réplica | Verificar B01 por SHA; después, publicar por digest y evaluar redundancia y healthchecks |
 | 12 | `init-db.js` borra todas las tablas | Script pensado para desarrollo | Inicialización idempotente que solo crea el esquema si no existe |
