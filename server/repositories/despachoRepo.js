@@ -154,9 +154,9 @@ class DespachoRepository {
                 fs.mililitros AS ml,
                 pc.precio AS precio,
                 CASE 
-                    WHEN fs.mililitros <= 300 THEN '🍺'
-                    WHEN fs.mililitros <= 600 THEN '🍻'
-                    ELSE '🛢️'
+                    WHEN fs.mililitros <= 300 THEN N'🍺'
+                    WHEN fs.mililitros <= 600 THEN N'🍻'
+                    ELSE N'🛢️'
                 END AS icon
             FROM FormatoServicio fs
             JOIN PrecioCerveza pc ON fs.id_formato = pc.id_formato 
