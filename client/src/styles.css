@@ -274,6 +274,10 @@ body {
 }
 
 /* Panel del Formulario de Alta */
+#vista-muro-gestion .section-canillas {
+    margin-bottom: 2.5rem;
+}
+
 .form-panel {
     background-color: var(--bg-surface);
     border: 1px solid var(--border-color);
@@ -424,7 +428,7 @@ body {
 /* Grid del Muro de Canillas */
 .muro-canillas {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
     gap: 1.5rem;
 }
 
@@ -1263,37 +1267,29 @@ body {
 }
 
 /* Modal / Tarjeta de Confirmación de Despacho & Ticket */
-.ticket-modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.75);
-    backdrop-filter: blur(4px);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 9999;
-}
-
 .ticket-modal-card {
+    position: fixed;
+    inset: 0;
+    margin: auto;
+    width: min(480px, calc(100% - 2rem));
+    height: fit-content;
+    max-height: calc(100dvh - 2rem);
+    overflow: auto;
     background: var(--bg-surface);
+    color: var(--text-primary);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-lg);
-    width: 90%;
-    max-width: 480px;
-    padding: 2rem;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8);
+    padding: clamp(1rem, 4vw, 2rem);
+}
+
+.ticket-modal-card::backdrop {
+    background: rgba(0, 0, 0, 0.65);
+}
+
+.ticket-modal-content {
     display: flex;
     flex-direction: column;
     gap: 1.25rem;
-    animation: scaleIn 0.25s ease-out;
-}
-
-@keyframes scaleIn {
-    from { opacity: 0; transform: scale(0.92); }
-    to { opacity: 1; transform: scale(1); }
 }
 
 .ticket-header {
@@ -1326,6 +1322,8 @@ body {
 .ticket-row {
     display: flex;
     justify-content: space-between;
+    gap: 0.75rem;
+    overflow-wrap: anywhere;
 }
 
 .ticket-row span:first-child {
@@ -1333,18 +1331,20 @@ body {
 }
 
 .ticket-row span:last-child {
+    text-align: right;
     font-weight: 700;
     color: var(--text-primary);
 }
 
 .ticket-actions {
     display: flex;
+    flex-wrap: wrap;
     gap: 0.75rem;
     margin-top: 0.5rem;
 }
 
 .btn-descargar-pdf {
-    flex: 1.5;
+    flex: 1.5 1 10rem;
     background: linear-gradient(135deg, var(--primary), #b45309);
     color: #000;
     border: none;
@@ -1365,7 +1365,7 @@ body {
 }
 
 .btn-cerrar-modal {
-    flex: 1;
+    flex: 1 1 8rem;
     background: var(--bg-card);
     border: 1px solid var(--border-color);
     color: var(--text-primary);

@@ -37,9 +37,14 @@ function mostrarAviso(texto, tipo = 'error') {
     aviso.textContent = texto;
     aviso.hidden = false;
     clearTimeout(mostrarAviso._t);
-    mostrarAviso._t = setTimeout(() => {
-        aviso.hidden = true;
-    }, 6000);
+    mostrarAviso._t = setTimeout(ocultarAvisoTerminal, 6000);
+}
+
+function ocultarAvisoTerminal() {
+    clearTimeout(mostrarAviso._t);
+    const aviso = document.getElementById('terminal-aviso');
+    aviso.hidden = true;
+    aviso.textContent = '';
 }
 
 // Estado reactivo de la terminal
@@ -53,7 +58,9 @@ const terminalState = {
     timerInterval: null,
     segundosRestantes: 45,
     formatoSeleccionado: null,
-    ultimoDespacho: null
+    procesandoDespacho: false,
+    ultimoDespacho: null,
+    despachosConfirmados: new Set()
 };
 
 /**
@@ -293,24 +300,17 @@ function asignarEventosNFC() {
         ejecutarDespacho();
     });
 
-    // Cerrar modal de ticket
-    document.getElementById('btn-cerrar-modal')?.addEventListener('click', () => {
-        const modal = document.getElementById('ticket-modal');
-        if (modal) {
-            if (typeof modal.close === 'function') modal.close();
-            else modal.style.display = 'none';
-        }
-        finalizarSesion();
+    // Nuevo Servido y Escape cierran el diálogo con la misma limpieza.
+    document.getElementById('btn-cerrar-modal').addEventListener('click', cerrarModalTicket);
+    const modal = document.getElementById('ticket-modal');
+    modal.addEventListener('cancel', (event) => {
+        event.preventDefault();
+        cerrarModalTicket();
     });
 
-    // Descargar PDF de ticket (Día 5)
-    document.getElementById('btn-descargar-pdf')?.addEventListener('click', () => {
-        if (terminalState.ultimoDespacho && terminalState.ultimoDespacho.id_despacho) {
-            if (window.ComprobanteManager) {
-                window.ComprobanteManager.descargarArchivo(terminalState.ultimoDespacho.id_despacho);
-            } else {
-                window.open(`${API_BASE}/despachos/${terminalState.ultimoDespacho.id_despacho}/comprobante`, '_blank');
-            }
+    document.getElementById('btn-descargar-pdf').addEventListener('click', () => {
+        if (modal.open && terminalState.ultimoDespacho) {
+            window.ComprobanteManager.descargarArchivo(terminalState.ultimoDespacho.id_despacho);
         }
     });
 }
@@ -319,6 +319,8 @@ function asignarEventosNFC() {
  * DÍA 2 & 3: Llama al endpoint de autenticación e inicia el TTL en el frontend
  */
 async function ejecutarTapNFC(idTarjeta, idCanilla) {
+    if (terminalState.procesandoDespacho || terminalState.ultimoDespacho) return;
+
     const btnTap = document.getElementById('btn-tap-nfc');
     if (btnTap) {
         btnTap.disabled = true;
@@ -437,6 +439,11 @@ function finalizarSesion(mensajeNotificacion = null) {
     }
 
     terminalState.sesionActiva = null;
+    terminalState.segundosRestantes = 45;
+    for (const id of ['lbl-titular', 'lbl-uid', 'lbl-canilla-activa', 'lbl-saldo', 'countdown-anuncio']) {
+        document.getElementById(id).textContent = '';
+    }
+    actualizarVisualTimer(45, 45);
 
     const panelStandby = document.getElementById('session-standby');
     const panelActive = document.getElementById('session-active-content');
@@ -455,6 +462,9 @@ function finalizarSesion(mensajeNotificacion = null) {
  * DÍA 4 & 5: Ejecución del Despacho Transaccional e Idempotente con Emisión de PDF
  */
 async function ejecutarDespacho() {
+    if (terminalState.procesandoDespacho || terminalState.ultimoDespacho ||
+        document.getElementById('btn-tap-nfc').disabled) return;
+
     if (!terminalState.sesionActiva) {
         mostrarAviso('No hay una sesión NFC activa para autorizar el servido.', 'error');
         return;
@@ -478,9 +488,20 @@ async function ejecutarDespacho() {
     // Generar clave de Idempotencia estricta (UUID / token único)
     const idempotencyKey = `idem-tap-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 
-    // Mostrar animación de servido
+    terminalState.procesandoDespacho = true;
+    clearInterval(terminalState.timerInterval);
+    terminalState.timerInterval = null;
+    ocultarAvisoTerminal();
+
+    const lector = document.querySelector('.nfc-simulator-card');
+    const btnServir = document.getElementById('btn-servir-cerveza');
+    lector.inert = true;
+    btnServir.disabled = true;
+
+    // Mostrar animación de servido mientras el backend resuelve la operación.
     const panelActive = document.getElementById('session-active-content');
     const animationBox = document.getElementById('pouring-animation');
+    document.getElementById('session-standby').style.display = 'none';
     if (panelActive) panelActive.style.display = 'none';
     if (animationBox) animationBox.style.display = 'flex';
 
@@ -501,81 +522,107 @@ async function ejecutarDespacho() {
 
         const data = await response.json();
 
-        if (response.ok && data.ok) {
-            terminalState.ultimoDespacho = data;
-            mostrarModalTicket(data);
-
-            // Refrescar tarjetas de la base de datos para actualizar saldo en pantalla
-            const resTarjetas = await fetch(`${API_BASE}/nfc/tarjetas`, {
-                headers: { ...AUTH_HEADERS }
-            });
-            if (resTarjetas.ok) {
-                const dataTarjetas = await resTarjetas.json();
-                terminalState.tarjetas = dataTarjetas.data || [];
-                renderizarTarjetasPreset();
-            }
-
-            // Refrescar stock de barriles si el dashboard de stock está disponible
-            if (window.dashboardStock && typeof window.dashboardStock.cargarStock === 'function') {
-                window.dashboardStock.cargarStock();
-            }
-        } else {
-            const mensajeError = MENSAJES[data.codigo] || data.error || MENSAJES.TRANSACTION_FAILED;
-            mostrarAviso(mensajeError, 'error');
-            finalizarSesion();
+        const idDespacho = String(data?.id_despacho);
+        if (!response.ok || data?.ok !== true || !/^[1-9]\d*$/.test(idDespacho)) {
+            mostrarAviso(MENSAJES[data?.codigo] || data?.error || MENSAJES.TRANSACTION_FAILED, 'error');
+            return;
         }
+
+        if (terminalState.despachosConfirmados.has(idDespacho)) return;
+        terminalState.despachosConfirmados.add(idDespacho);
+        terminalState.ultimoDespacho = data;
     } catch (err) {
         console.error('Error al ejecutar despacho:', err);
         mostrarAviso('Error de conexión al procesar el servido.', 'error');
+        return;
+    } finally {
         finalizarSesion();
+        terminalState.procesandoDespacho = false;
+        lector.inert = false;
+        btnServir.disabled = false;
+    }
+
+    mostrarModalTicket();
+    refrescarDatosTrasDespacho();
+}
+
+async function refrescarDatosTrasDespacho() {
+    const totalConfirmados = terminalState.despachosConfirmados.size;
+    try {
+        const resTarjetas = await fetch(API_BASE + '/nfc/tarjetas', {
+            headers: AUTH_HEADERS
+        });
+        if (resTarjetas.ok) {
+            const data = await resTarjetas.json();
+            if (totalConfirmados === terminalState.despachosConfirmados.size) {
+                terminalState.tarjetas = data.data || [];
+                renderizarTarjetasPreset();
+            }
+        }
+        await window.dashboardStock?.cargarStock();
+    } catch (error) {
+        console.error('Error al actualizar datos tras el servido:', error);
     }
 }
 
-/**
- * DÍA 5: Muestra el modal con el ticket de consumo y botón de descarga de PDF
- */
-function mostrarModalTicket(despacho) {
+const camposTicket = [
+    'modal-id-despacho', 'modal-cliente', 'modal-cerveza',
+    'modal-formato', 'modal-importe', 'modal-saldo-restante'
+];
+
+function formatearMonedaTicket(valor) {
+    if (valor == null || valor === '' || !Number.isFinite(Number(valor))) return '';
+    return '$' + Number(valor).toLocaleString('es-AR', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    });
+}
+
+function mostrarModalTicket() {
     const modal = document.getElementById('ticket-modal');
-    if (!modal) return;
+    const despacho = terminalState.ultimoDespacho;
+    if (!despacho || modal.open || document.getElementById('vista-terminal-nfc').classList.contains('oculta')) return;
 
-    // Obtener importe con fallbacks seguros para evitar NaN
-    const rawImporte = despacho.importe_cobrado ?? 
-                       despacho.precio_cobrado ?? 
-                       despacho.importe_debitado ?? 
-                       despacho.importe ?? 
-                       terminalState.formatoSeleccionado?.precio ?? 
-                       0;
-    const importeMonto = Number(rawImporte) || 0;
+    const mlServidos = despacho.mililitros_servidos ??
+        (despacho.volumen_litros == null ? null : Number(despacho.volumen_litros) * 1000);
+    const volumen = mlServidos == null ? '' : mlServidos + ' ml';
+    const formato = despacho.formato && volumen ? despacho.formato + ' (' + volumen + ')' : despacho.formato || volumen;
+    const valores = [
+        '#' + despacho.id_despacho,
+        despacho.cliente || despacho.cliente_nombre,
+        despacho.cerveza,
+        formato,
+        formatearMonedaTicket(despacho.importe_cobrado ?? despacho.precio_cobrado ?? despacho.importe_debitado ?? despacho.importe),
+        formatearMonedaTicket(despacho.saldo_restante)
+    ];
 
-    const rawSaldo = despacho.saldo_restante ?? 
-                     terminalState.sesionActiva?.saldo_disponible ?? 
-                     0;
-    const saldoMonto = Number(rawSaldo) || 0;
-
-    const canillaObj = terminalState.canillas?.find(c => (c.id_canilla || c.numero) === terminalState.canillaSeleccionada);
-    const nombreCerveza = despacho.cerveza || canillaObj?.nombre_cerveza || canillaObj?.estilo || 'Cerveza Ombú';
-    const nombreFormato = despacho.formato || terminalState.formatoSeleccionado?.nombre || 'Pinta';
-    const mlServidos = despacho.mililitros_servidos || (despacho.volumen_litros ? despacho.volumen_litros * 1000 : null) || terminalState.formatoSeleccionado?.ml || 500;
-    const nombreCliente = despacho.cliente || despacho.cliente_nombre || terminalState.sesionActiva?.cliente_nombre || 'Consumidor Final';
-
-    document.getElementById('modal-id-despacho').textContent = `#${despacho.id_despacho || '-'}`;
-    document.getElementById('modal-cerveza').textContent = nombreCerveza;
-    document.getElementById('modal-formato').textContent = `${nombreFormato} (${mlServidos} ml)`;
-    document.getElementById('modal-importe').textContent = `$${importeMonto.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`;
-    document.getElementById('modal-saldo-restante').textContent = `$${saldoMonto.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`;
-    document.getElementById('modal-cliente').textContent = nombreCliente;
-
-    // F-14: Apertura accesible mediante modal nativo <dialog>
-    if (typeof modal.showModal === 'function') {
-        modal.showModal();
-    } else {
-        modal.style.display = 'flex';
-    }
+    camposTicket.forEach((id, indice) => {
+        document.getElementById(id).textContent = valores[indice] ?? '';
+    });
+    modal.showModal();
 }
 
-// Exponer para la navegación reactiva entre vistas
+function cerrarModalTicket() {
+    const modal = document.getElementById('ticket-modal');
+    if (!modal.open) return;
+
+    terminalState.ultimoDespacho = null;
+    for (const id of camposTicket) {
+        document.getElementById(id).textContent = '';
+    }
+    modal.close();
+    document.getElementById('btn-tap-nfc').focus();
+}
+
+// Mostrar una confirmación pendiente si la operación terminó en otra vista.
 window.terminalNfc = {
-    cargarDatosDesdeServidor
+    activarVista() {
+        if (terminalState.ultimoDespacho) {
+            mostrarModalTicket();
+        } else if (!terminalState.procesandoDespacho) {
+            cargarDatosDesdeServidor();
+        }
+    }
 };
 
 // Auto-inicializar al cargar
