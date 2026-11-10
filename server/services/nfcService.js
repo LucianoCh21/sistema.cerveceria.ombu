@@ -129,7 +129,21 @@ class NfcService {
     }
 
     async getFormatosYPrecios(idCanilla) {
-        return despachoRepo.getFormatosYPreciosPorCanilla(idCanilla);
+        const canillaId = idCanilla === null || idCanilla === undefined ? null : parsearIdCanilla(idCanilla);
+        if (idCanilla !== null && idCanilla !== undefined && canillaId === null) {
+            const err = new Error("El número de canilla no es válido.");
+            err.codigo = "INVALID_TAP";
+            err.status = 400;
+            throw err;
+        }
+        const resultado = await despachoRepo.getFormatosYPreciosPorCanilla(canillaId);
+        if (resultado.canillaEncontrada === false) {
+            const err = new Error(`La canilla ${canillaId} no existe.`);
+            err.codigo = "TAP_NOT_FOUND";
+            err.status = 404;
+            throw err;
+        }
+        return resultado;
     }
 }
 
