@@ -134,9 +134,15 @@ class DespachoRepository {
                     LEFT JOIN Cerveza ce ON b.id_cerveza = ce.id_cerveza
                     WHERE c.id_canilla = @id_canilla
                 `);
-            if (canillaResult.recordset.length > 0) {
-                idCerveza = canillaResult.recordset[0].id_cerveza;
-                nombreCerveza = canillaResult.recordset[0].nombre_cerveza;
+            if (canillaResult.recordset.length === 0) {
+                return { idCanilla, canillaEncontrada: false, sinBarril: true, idCerveza: null, nombreCerveza: null, formatos: [] };
+            }
+            idCerveza = canillaResult.recordset[0].id_cerveza;
+            nombreCerveza = canillaResult.recordset[0].nombre_cerveza;
+            // Canilla sin barril conectado: no hay cerveza que vender, así que no se listan precios
+            // (antes se devolvían los de todas las cervezas).
+            if (!idCerveza) {
+                return { idCanilla, canillaEncontrada: true, sinBarril: true, idCerveza: null, nombreCerveza: null, formatos: [] };
             }
         }
 

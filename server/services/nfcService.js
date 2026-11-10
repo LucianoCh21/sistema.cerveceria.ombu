@@ -1,6 +1,17 @@
 const tarjetaRepo = require('../repositories/tarjetaRepo');
 const despachoRepo = require('../repositories/despachoRepo');
+const canillaRepo = require('../repositories/canillaRepo');
 const { setNfcSession, getNfcSession } = require('../config/redis');
+
+const MAX_INT_SQL = 2147483647;
+
+/**
+ * Convierte id_canilla a entero positivo (acepta 3 o "3"). Devuelve null si no es válido.
+ */
+const parsearIdCanilla = (valor) => {
+    const n = typeof valor === 'string' && /^\d+$/.test(valor.trim()) ? Number(valor) : valor;
+    return Number.isInteger(n) && n > 0 && n <= MAX_INT_SQL ? n : null;
+};
 
 /**
  * Servicio de Negocio NFC
@@ -11,6 +22,28 @@ class NfcService {
             const err = new Error("Faltan parámetros obligatorios: id_tarjeta e id_canilla son requeridos.");
             err.codigo = "MISSING_PARAMETERS";
             err.status = 400;
+            throw err;
+        }
+
+        // Validación de la canilla ANTES de abrir la sesión en Redis: entero positivo, existe y está 'Activa'.
+        const canillaId = parsearIdCanilla(idCanilla);
+        if (canillaId === null) {
+            const err = new Error("El número de canilla no es válido.");
+            err.codigo = "INVALID_TAP";
+            err.status = 400;
+            throw err;
+        }
+        const canilla = await canillaRepo.findById(canillaId);
+        if (!canilla) {
+            const err = new Error(`La canilla ${canillaId} no existe.`);
+            err.codigo = "TAP_NOT_FOUND";
+            err.status = 404;
+            throw err;
+        }
+        if (canilla.estado !== 'Activa') {
+            const err = new Error(`La canilla ${canillaId} no está habilitada (Estado: ${canilla.estado}).`);
+            err.codigo = "TAP_INACTIVE";
+            err.status = 409;
             throw err;
         }
 
@@ -47,7 +80,7 @@ class NfcService {
             uid_tarjeta: tarjeta.id_tarjeta,
             id_cliente: tarjeta.id_cliente || null,
             cliente_nombre: clienteNombre,
-            id_canilla: Number(idCanilla),
+            id_canilla: canillaId,
             saldo_disponible: saldoDisponible,
             iniciado_en: new Date().toISOString()
         };
@@ -68,7 +101,7 @@ class NfcService {
             id_cliente: tarjeta.id_cliente || null,
             cliente_nombre: clienteNombre,
             saldo_disponible: saldoDisponible,
-            id_canilla: Number(idCanilla),
+            id_canilla: canillaId,
             ttl_segundos: ttlSegundos
         };
     }
@@ -96,7 +129,21 @@ class NfcService {
     }
 
     async getFormatosYPrecios(idCanilla) {
-        return despachoRepo.getFormatosYPreciosPorCanilla(idCanilla);
+        const canillaId = idCanilla === null || idCanilla === undefined ? null : parsearIdCanilla(idCanilla);
+        if (idCanilla !== null && idCanilla !== undefined && canillaId === null) {
+            const err = new Error("El número de canilla no es válido.");
+            err.codigo = "INVALID_TAP";
+            err.status = 400;
+            throw err;
+        }
+        const resultado = await despachoRepo.getFormatosYPreciosPorCanilla(canillaId);
+        if (resultado.canillaEncontrada === false) {
+            const err = new Error(`La canilla ${canillaId} no existe.`);
+            err.codigo = "TAP_NOT_FOUND";
+            err.status = 404;
+            throw err;
+        }
+        return resultado;
     }
 }
 

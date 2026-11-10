@@ -72,10 +72,24 @@ const getTarjetas = async (req, res) => {
 };
 
 const getFormatosYPrecios = async (req, res) => {
-    const idCanilla = req.query.id_canilla ? Number(req.query.id_canilla) : null;
+    const idCanilla = req.query.id_canilla !== undefined && req.query.id_canilla !== '' ? req.query.id_canilla : null;
 
     try {
         const resultado = await nfcService.getFormatosYPrecios(idCanilla);
+        // Canilla sin barril: 200 con lista vacía y bandera explícita (el cliente actual
+        // limpia los precios en pantalla con una lista vacía; un 409 los dejaría desactualizados).
+        if (resultado.sinBarril) {
+            return res.status(200).json({
+                ok: true,
+                id_canilla: Number(resultado.idCanilla),
+                sin_barril: true,
+                codigo: 'NO_ACTIVE_BARREL',
+                mensaje: 'Esta canilla no tiene un barril conectado: no hay formatos a la venta.',
+                id_cerveza: null,
+                cerveza: null,
+                formatos: []
+            });
+        }
         return res.status(200).json({
             ok: true,
             id_canilla: resultado.idCanilla,
@@ -84,6 +98,9 @@ const getFormatosYPrecios = async (req, res) => {
             formatos: resultado.formatos
         });
     } catch (error) {
+        if (error.status && error.status < 500) {
+            return res.status(error.status).json({ ok: false, error: error.message, codigo: error.codigo || 'VALIDATION_ERROR' });
+        }
         const traceId = Date.now().toString(36);
         console.error(`[${traceId}] [NFC Controller] Error en getFormatosYPrecios:`, error);
         return res.status(500).json({
